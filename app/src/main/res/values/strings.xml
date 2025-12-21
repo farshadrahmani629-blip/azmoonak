@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!-- نام اپ – با نام جدید پروژه هماهنگ کردم -->
+    <string name="app_name">ExamApp</string>
+
+    <!-- اگر stringهای دیگه‌ای بعداً نیاز داشتی، اینجا اضافه کن -->
+    <!-- مثال:
+    <string name="hello_world">سلام دنیا!</string>
+    <string name="exam_start">شروع آزمون</string>
+    -->
+
+</resources>

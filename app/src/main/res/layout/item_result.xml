@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.cardview.widget.CardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/rootView"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_margin="8dp"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="2dp"
+    app:cardUseCompatPadding="true">
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:padding="16dp"
+        android:background="@drawable/item_result_normal">
+
+        <!-- Exam title -->
+        <TextView
+            android:id="@+id/tvExamTitle"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="آزمون فارسی درس ۱"
+            android:textSize="16sp"
+            android:textStyle="bold"
+            android:textColor="@color/black"
+            android:layout_alignParentStart="true"
+            android:layout_toStartOf="@+id/tvScore" />
+
+        <!-- Score (percentage) -->
+        <TextView
+            android:id="@+id/tvScore"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="85.5%"
+            android:textSize="20sp"
+            android:textStyle="bold"
+            android:textColor="@color/purple_700"
+            android:layout_alignParentEnd="true"
+            android:layout_marginStart="12dp" />
+
+        <!-- Correct answers -->
+        <TextView
+            android:id="@+id/tvCorrectAnswers"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="۱۷ از ۲۰"
+            android:textSize="14sp"
+            android:textColor="@color/gray_500"
+            android:layout_below="@id/tvExamTitle"
+            android:layout_alignParentStart="true"
+            android:layout_marginTop="4dp" />
+
+        <!-- Date -->
+        <TextView
+            android:id="@+id/tvDate"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="۱۴۰۲/۱۰/۱۵ - ۱۴:۳۰"
+            android:textSize="12sp"
+            android:textColor="@color/gray_500"
+            android:layout_below="@id/tvScore"
+            android:layout_alignParentEnd="true"
+            android:layout_marginTop="4dp" />
+
+        <!-- Delete button -->
+        <ImageView
+            android:id="@+id/btnDelete"
+            android:layout_width="24dp"
+            android:layout_height="24dp"
+            android:src="@drawable/ic_delete"
+            android:contentDescription="حذف"
+            android:tint="@color/gray_500"
+            android:layout_alignParentEnd="true"
+            android:layout_centerVertical="true"
+            android:padding="4dp"
+            android:background="?attr/selectableItemBackgroundBorderless" />
+
+        <!-- Time taken -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="⏱️ ۲۵:۴۰"
+            android:textSize="12sp"
+            android:textColor="@color/gray_500"
+            android:drawablePadding="4dp"
+            android:layout_below="@id/tvCorrectAnswers"
+            android:layout_alignParentStart="true"
+            android:layout_marginTop="8dp" />
+
+        <!-- Performance icon -->
+        <ImageView
+            android:layout_width="20dp"
+            android:layout_height="20dp"
+            android:src="@drawable/ic_star"
+            android:contentDescription="عملکرد"
+            android:tint="@color/yellow"
+            android:layout_alignParentEnd="true"
+            android:layout_alignBottom="@id/tvDate"
+            android:layout_marginEnd="32dp" />
+
+    </RelativeLayout>
+
+</androidx.cardview.widget.CardView>
