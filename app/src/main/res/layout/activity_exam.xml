@@ -1,45 +1,46 @@
 <?xml version="1.0" encoding="utf-8"?>
-<androidx.constraintlayout.widget.ConstraintLayout
-    xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/white"
+    android:background="@color/background"
     tools:context=".ui.exam.ExamActivity">
 
-    <!-- Header with exam info and timer -->
+    <!-- ==================== HEADER ==================== -->
     <LinearLayout
         android:id="@+id/headerLayout"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="@color/purple_700"
+        android:background="@color/primary"
         android:padding="16dp"
         app:layout_constraintTop_toTopOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <!-- Exam title and question counter -->
+        <!-- ردیف اول: عنوان آزمون و شماره سوال -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:layout_marginBottom="8dp">
+            android:gravity="center_vertical">
 
+            <!-- عنوان آزمون -->
             <TextView
                 android:id="@+id/tvExamTitle"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
-                android:text="آزمون فارسی پایه چهارم"
+                android:text="آزمون فارسی"
                 android:textSize="18sp"
                 android:textColor="@color/white"
                 android:textStyle="bold"
                 android:maxLines="1"
-                android:ellipsize="end"/>
+                android:ellipsize="end"
+                android:textDirection="rtl"/>
 
+            <!-- شماره سوال -->
             <TextView
                 android:id="@+id/tvQuestionCounter"
                 android:layout_width="wrap_content"
@@ -53,13 +54,62 @@
                 android:backgroundTint="@color/white_20"/>
         </LinearLayout>
 
-        <!-- Progress bar and timer -->
+        <!-- ردیف دوم: اطلاعات آزمون -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center"
+            android:layout_marginTop="8dp"
+            android:weightSum="3">
+
+            <!-- درس -->
+            <TextView
+                android:id="@+id/tvSubject"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="درس: فارسی"
+                android:textSize="12sp"
+                android:textColor="@color/white_80"
+                android:gravity="center"
+                android:textDirection="rtl"/>
+
+            <!-- زمان -->
+            <TextView
+                android:id="@+id/tvLevel"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="زمان: 45 دقیقه"
+                android:textSize="12sp"
+                android:textColor="@color/white_80"
+                android:gravity="center"
+                android:textDirection="rtl"/>
+
+            <!-- تایمر -->
+            <TextView
+                android:id="@+id/tvTimer"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="45:00"
+                android:textSize="16sp"
+                android:textColor="@color/white"
+                android:textStyle="bold"
+                android:gravity="center"
+                android:background="@drawable/rounded_corner_white"
+                android:backgroundTint="@color/white_20"
+                android:paddingVertical="4dp"/>
+        </LinearLayout>
+
+        <!-- ردیف سوم: نوار پیشرفت -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
             android:gravity="center_vertical"
-            android:layout_marginTop="4dp">
+            android:layout_marginTop="12dp">
 
             <ProgressBar
                 android:id="@+id/progressBar"
@@ -74,294 +124,488 @@
                 android:layout_marginEnd="12dp"/>
 
             <TextView
-                android:id="@+id/tvTimer"
+                android:id="@+id/txtProgress"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:text="45:00"
-                android:textSize="16sp"
+                android:text="5%"
+                android:textSize="12sp"
                 android:textColor="@color/white"
-                android:textStyle="bold"
-                android:drawableStart="@drawable/ic_timer"
-                android:drawablePadding="4dp"
-                android:paddingHorizontal="8dp"
-                android:paddingVertical="4dp"
-                android:background="@drawable/rounded_corner_white"
-                android:backgroundTint="@color/white_20"/>
+                android:minWidth="40dp"/>
         </LinearLayout>
     </LinearLayout>
 
-    <!-- Question content area -->
-    <androidx.core.widget.NestedScrollView
-        android:id="@+id/scrollView"
+    <!-- ==================== LOADING STATE ==================== -->
+    <LinearLayout
+        android:id="@+id/loadingLayout"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:padding="20dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/headerLayout"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ProgressBar
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:indeterminateTint="@color/primary"/>
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="در حال بارگذاری آزمون..."
+            android:textSize="16sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginTop="16dp"
+            android:textDirection="rtl"/>
+    </LinearLayout>
+
+    <!-- ==================== ERROR STATE ==================== -->
+    <LinearLayout
+        android:id="@+id/errorLayout"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/headerLayout"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageView
+            android:layout_width="80dp"
+            android:layout_height="80dp"
+            android:src="@drawable/ic_error"
+            android:tint="@color/error"
+            android:layout_marginBottom="24dp"/>
+
+        <TextView
+            android:id="@+id/txtExamInfo"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="خطا در بارگذاری آزمون"
+            android:textSize="18sp"
+            android:textColor="@color/text_primary"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"
+            android:textDirection="rtl"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="لطفاً اتصال اینترنت خود را بررسی کنید و مجدداً تلاش نمایید."
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:layout_marginBottom="32dp"
+            android:textDirection="rtl"
+            android:lineSpacingExtra="4dp"/>
+
+        <Button
+            android:id="@+id/btnRetry"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="تلاش مجدد"
+            android:textSize="16sp"
+            android:paddingHorizontal="32dp"
+            android:backgroundTint="@color/primary"
+            android:textColor="@color/white"/>
+    </LinearLayout>
+
+    <!-- ==================== READY STATE ==================== -->
+    <LinearLayout
+        android:id="@+id/readyLayout"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/headerLayout"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageView
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/ic_exam_ready"
+            android:layout_marginBottom="32dp"/>
+
+        <TextView
+            android:id="@+id/tvReadyExamTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="آزمون فارسی پایه چهارم"
+            android:textSize="22sp"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"
+            android:textDirection="rtl"/>
+
+        <TextView
+            android:id="@+id/tvReadyQuestionCount"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="تعداد سوالات: ۲۰ سوال"
+            android:textSize="16sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:layout_marginBottom="8dp"
+            android:textDirection="rtl"/>
+
+        <TextView
+            android:id="@+id/tvReadyDuration"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="زمان آزمون: ۴۵ دقیقه"
+            android:textSize="16sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:layout_marginBottom="32dp"
+            android:textDirection="rtl"/>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="پس از شروع آزمون، زمان شما شروع می‌شود و امکان توقف وجود ندارد."
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:layout_marginBottom="32dp"
+            android:textDirection="rtl"
+            android:lineSpacingExtra="4dp"/>
+
+        <Button
+            android:id="@+id/btnStartExam"
+            android:layout_width="wrap_content"
+            android:layout_height="56dp"
+            android:text="شروع آزمون"
+            android:textSize="18sp"
+            android:paddingHorizontal="48dp"
+            android:backgroundTint="@color/primary"
+            android:textColor="@color/white"
+            android:elevation="4dp"/>
+
+        <Button
+            android:id="@+id/btnDownloadExam"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="دانلود آزمون"
+            android:textSize="16sp"
+            android:paddingHorizontal="32dp"
+            android:layout_marginTop="16dp"
+            android:backgroundTint="@color/surface"
+            android:textColor="@color/primary"
+            android:visibility="gone"/>
+    </LinearLayout>
+
+    <!-- ==================== EXAM STATE (محتوای اصلی) ==================== -->
+    <LinearLayout
+        android:id="@+id/examLayout"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:visibility="gone"
         app:layout_constraintTop_toBottomOf="@id/headerLayout"
         app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
-        <LinearLayout
+        <androidx.core.widget.NestedScrollView
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:padding="20dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <!-- اطلاعات سوال -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginBottom="16dp"
+                    android:weightSum="3">
+
+                    <TextView
+                        android:id="@+id/tvQuestionType"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="چندگزینه‌ای"
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary"
+                        android:gravity="center"
+                        android:background="@drawable/rounded_corner_gray"
+                        android:paddingVertical="4dp"
+                        android:textDirection="rtl"/>
+
+                    <TextView
+                        android:id="@+id/tvDifficulty"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="سختی: متوسط"
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary"
+                        android:gravity="center"
+                        android:background="@drawable/rounded_corner_gray"
+                        android:paddingVertical="4dp"
+                        android:textDirection="rtl"/>
+
+                    <TextView
+                        android:id="@+id/tvPoints"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:text="نمره: ۱"
+                        android:textSize="12sp"
+                        android:textColor="@color/text_secondary"
+                        android:gravity="center"
+                        android:background="@drawable/rounded_corner_gray"
+                        android:paddingVertical="4dp"
+                        android:textDirection="rtl"/>
+                </LinearLayout>
+
+                <!-- متن سوال -->
+                <TextView
+                    android:id="@+id/tvQuestionText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="متن سوال اینجا نمایش داده می‌شود..."
+                    android:textSize="18sp"
+                    android:textColor="@color/text_primary"
+                    android:lineSpacingExtra="8dp"
+                    android:textDirection="rtl"
+                    android:layout_marginBottom="24dp"/>
+
+                <!-- تصویر سوال -->
+                <ImageView
+                    android:id="@+id/imgQuestion"
+                    android:layout_width="match_parent"
+                    android:layout_height="200dp"
+                    android:scaleType="centerCrop"
+                    android:visibility="gone"
+                    android:background="@color/surface"
+                    android:layout_marginBottom="24dp"/>
+
+                <!-- گزینه‌های چندگزینه‌ای (MCQ) -->
+                <LinearLayout
+                    android:id="@+id/optionsContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginBottom="16dp"
+                    android:visibility="gone">
+                    <!-- RadioButtonها در کد اضافه می‌شوند -->
+                </LinearLayout>
+
+                <!-- پاسخ کوتاه -->
+                <LinearLayout
+                    android:id="@+id/layoutShortAnswer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginBottom="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="پاسخ خود را وارد کنید:"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginBottom="8dp"
+                        android:textDirection="rtl"/>
+
+                    <EditText
+                        android:id="@+id/editTextAnswer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="پاسخ کوتاه..."
+                        android:inputType="text"
+                        android:textDirection="rtl"
+                        android:gravity="start|top"
+                        android:minHeight="48dp"
+                        android:background="@drawable/edittext_background"/>
+                </LinearLayout>
+
+                <!-- پاسخ تشریحی -->
+                <LinearLayout
+                    android:id="@+id/layoutDescriptive"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginBottom="16dp">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="پاسخ تشریحی خود را بنویسید:"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginBottom="8dp"
+                        android:textDirection="rtl"/>
+
+                    <EditText
+                        android:id="@+id/editTextDescriptive"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:hint="پاسخ تشریحی..."
+                        android:inputType="textMultiLine"
+                        android:textDirection="rtl"
+                        android:gravity="start|top"
+                        android:minHeight="120dp"
+                        android:background="@drawable/edittext_background"/>
+                </LinearLayout>
+
+                <!-- وضعیت پاسخ -->
+                <TextView
+                    android:id="@+id/tvAnsweredCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="پاسخ داده شده: ۰"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_gravity="end"
+                    android:layout_marginTop="16dp"/>
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+    </LinearLayout>
+
+    <!-- ==================== COMPLETED STATE ==================== -->
+    <LinearLayout
+        android:id="@+id/completedLayout"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:padding="32dp"
+        android:visibility="gone"
+        app:layout_constraintTop_toBottomOf="@id/headerLayout"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent">
+
+        <ImageView
+            android:layout_width="120dp"
+            android:layout_height="120dp"
+            android:src="@drawable/ic_success"
+            android:tint="@color/success"
+            android:layout_marginBottom="32dp"/>
+
+        <TextView
+            android:id="@+id/txtExamResult"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:text="آزمون با موفقیت ثبت شد"
+            android:textSize="22sp"
+            android:textColor="@color/text_primary"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="16dp"
+            android:textDirection="rtl"/>
 
-            <!-- Question text -->
-            <TextView
-                android:id="@+id/tvQuestionText"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="متن سوال اینجا نمایش داده می‌شود..."
-                android:textSize="18sp"
-                android:textColor="@color/black"
-                android:lineSpacingExtra="4dp"
-                android:textDirection="rtl"
-                android:layout_marginBottom="24dp"/>
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="نتیجه آزمون برای شما ارسال خواهد شد."
+            android:textSize="16sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:layout_marginBottom="32dp"
+            android:textDirection="rtl"/>
 
-            <!-- Question image (optional) -->
-            <ImageView
-                android:id="@+id/ivQuestionImage"
-                android:layout_width="match_parent"
-                android:layout_height="200dp"
-                android:scaleType="centerCrop"
-                android:visibility="gone"
-                android:adjustViewBounds="true"
-                android:layout_marginBottom="24dp"
-                android:background="@color/gray_light"/>
+        <Button
+            android:id="@+id/btnViewResults"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="مشاهده نتایج"
+            android:textSize="16sp"
+            android:paddingHorizontal="32dp"
+            android:backgroundTint="@color/primary"
+            android:textColor="@color/white"/>
+    </LinearLayout>
 
-            <!-- Options container -->
-            <LinearLayout
-                android:id="@+id/optionsContainer"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginBottom="16dp">
-
-                <!-- Option 1 -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardOption1"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp"
-                    app:cardUseCompatPadding="true">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="16dp"
-                        android:background="@drawable/option_background">
-
-                        <TextView
-                            android:id="@+id/tvOption1Text"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="گزینه اول"
-                            android:textSize="16sp"
-                            android:textColor="@color/black"
-                            android:textDirection="rtl"
-                            android:paddingEnd="12dp"/>
-
-                        <RadioButton
-                            android:id="@+id/rbOption1"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:buttonTint="@color/purple_700"/>
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <!-- Option 2 -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardOption2"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp"
-                    app:cardUseCompatPadding="true">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="16dp"
-                        android:background="@drawable/option_background">
-
-                        <TextView
-                            android:id="@+id/tvOption2Text"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="گزینه دوم"
-                            android:textSize="16sp"
-                            android:textColor="@color/black"
-                            android:textDirection="rtl"
-                            android:paddingEnd="12dp"/>
-
-                        <RadioButton
-                            android:id="@+id/rbOption2"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:buttonTint="@color/purple_700"/>
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <!-- Option 3 -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardOption3"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginBottom="12dp"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp"
-                    app:cardUseCompatPadding="true">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="16dp"
-                        android:background="@drawable/option_background">
-
-                        <TextView
-                            android:id="@+id/tvOption3Text"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="گزینه سوم"
-                            android:textSize="16sp"
-                            android:textColor="@color/black"
-                            android:textDirection="rtl"
-                            android:paddingEnd="12dp"/>
-
-                        <RadioButton
-                            android:id="@+id/rbOption3"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:buttonTint="@color/purple_700"/>
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-
-                <!-- Option 4 -->
-                <androidx.cardview.widget.CardView
-                    android:id="@+id/cardOption4"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    app:cardCornerRadius="12dp"
-                    app:cardElevation="2dp"
-                    app:cardUseCompatPadding="true">
-
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical"
-                        android:padding="16dp"
-                        android:background="@drawable/option_background">
-
-                        <TextView
-                            android:id="@+id/tvOption4Text"
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:text="گزینه چهارم"
-                            android:textSize="16sp"
-                            android:textColor="@color/black"
-                            android:textDirection="rtl"
-                            android:paddingEnd="12dp"/>
-
-                        <RadioButton
-                            android:id="@+id/rbOption4"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:buttonTint="@color/purple_700"/>
-                    </LinearLayout>
-                </androidx.cardview.widget.CardView>
-            </LinearLayout>
-
-            <!-- Flag question button -->
-            <Button
-                android:id="@+id/btnFlag"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_gravity="end"
-                android:text="📌 علامت‌گذاری"
-                android:textSize="14sp"
-                android:drawablePadding="4dp"
-                android:paddingHorizontal="16dp"
-                android:backgroundTint="@color/gray_light"
-                android:textColor="@color/black"
-                android:layout_marginTop="8dp"/>
-        </LinearLayout>
-    </androidx.core.widget.NestedScrollView>
-
-    <!-- Bottom navigation -->
+    <!-- ==================== BOTTOM NAVIGATION ==================== -->
     <LinearLayout
         android:id="@+id/bottomNavigation"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal"
-        android:background="@color/white"
+        android:background="@color/surface"
         android:elevation="8dp"
         android:padding="16dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent">
 
+        <!-- دکمه علامت‌گذاری -->
         <Button
-            android:id="@+id/btnPrevious"
-            android:layout_width="0dp"
-            android:layout_height="48dp"
-            android:layout_weight="1"
-            android:text="قبلی"
-            android:textSize="16sp"
-            android:drawableStart="@drawable/ic_prev"
-            android:drawablePadding="8dp"
-            android:enabled="false"
-            android:backgroundTint="@color/gray_light"
-            android:layout_marginEnd="8dp"/>
-
-        <Button
-            android:id="@+id/btnQuestionsList"
+            android:id="@+id/btnFlagQuestion"
             android:layout_width="wrap_content"
             android:layout_height="48dp"
-            android:text="لیست سوالات"
-            android:textSize="16sp"
-            android:drawableStart="@drawable/ic_list"
-            android:drawablePadding="8dp"
-            android:backgroundTint="@color/purple_200"
-            android:layout_marginHorizontal="8dp"/>
+            android:text="علامت‌گذاری"
+            android:textSize="14sp"
+            android:drawablePadding="4dp"
+            android:paddingHorizontal="16dp"
+            android:backgroundTint="@color/surface"
+            android:textColor="@color/text_secondary"
+            android:layout_marginEnd="8dp"/>
 
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="0dp"
+            android:layout_weight="1"/>
+
+        <!-- دکمه قبلی -->
+        <Button
+            android:id="@+id/btnPrevious"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="قبلی"
+            android:textSize="16sp"
+            android:paddingHorizontal="24dp"
+            android:backgroundTint="@color/surface"
+            android:textColor="@color/primary"
+            android:layout_marginEnd="8dp"
+            android:enabled="false"/>
+
+        <!-- دکمه بعدی/ارسال -->
         <Button
             android:id="@+id/btnNext"
-            android:layout_width="0dp"
+            android:layout_width="wrap_content"
             android:layout_height="48dp"
-            android:layout_weight="1"
             android:text="بعدی"
             android:textSize="16sp"
-            android:drawableEnd="@drawable/ic_next"
-            android:drawablePadding="8dp"
-            android:backgroundTint="@color/purple_700"
+            android:paddingHorizontal="24dp"
+            android:backgroundTint="@color/primary"
+            android:textColor="@color/white"
+            android:layout_marginStart="8dp"/>
+
+        <!-- دکمه ارسال (در سوال آخر نشان داده می‌شود) -->
+        <Button
+            android:id="@+id/btnSubmit"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:text="ارسال"
+            android:textSize="16sp"
+            android:paddingHorizontal="24dp"
+            android:backgroundTint="@color/success"
+            android:textColor="@color/white"
+            android:visibility="gone"
             android:layout_marginStart="8dp"/>
     </LinearLayout>
-
-    <!-- Finish exam FAB -->
-    <com.google.android.material.floatingactionbutton.FloatingActionButton
-        android:id="@+id/fabFinish"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_margin="24dp"
-        android:contentDescription="پایان آزمون"
-        app:backgroundTint="@color/red"
-        app:tint="@color/white"
-        app:srcCompat="@drawable/ic_finish"
-        app:layout_constraintBottom_toTopOf="@id/bottomNavigation"
-        app:layout_constraintEnd_toEndOf="parent"/>
 
 </androidx.constraintlayout.widget.ConstraintLayout>

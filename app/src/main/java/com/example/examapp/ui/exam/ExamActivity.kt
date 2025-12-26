@@ -1,7 +1,8 @@
-// app/src/main/java/com/examapp/ui/exam/ExamActivity.kt
 package com.examapp.ui.exam
 
+import android.content.Intent
 import android.os.Bundle
+import android.os.CountDownTimer
 import android.view.View
 import android.widget.*
 import androidx.activity.viewModels
@@ -9,17 +10,25 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.isVisible
 import androidx.lifecycle.lifecycleScope
 import com.examapp.R
-import com.examapp.data.models.Question
+import com.examapp.data.models.Student
+import com.examapp.data.remote.ExamRemote
+import com.examapp.ui.result.ResultActivity
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
+import timber.log.Timber
+import java.util.concurrent.TimeUnit
 
 @AndroidEntryPoint
 class ExamActivity : AppCompatActivity() {
 
-    // ------------ ViewModel ------------
-    private val viewModel: ExamActivityViewModel by viewModels()
+    private val viewModel: ExamViewModel by viewModels()
 
-    // ------------ Viewها ------------
+    // Views
+    private lateinit var txtStudentName: TextView
+    private lateinit var txtGrade: TextView
+    private lateinit var txtTeacherName: TextView
+    private lateinit var txtSubject: TextView
+    private lateinit var txtLevel: TextView
     private lateinit var txtExamTitle: TextView
     private lateinit var txtQuestionNumber: TextView
     private lateinit var txtQuestionText: TextView
@@ -27,17 +36,19 @@ class ExamActivity : AppCompatActivity() {
     private lateinit var txtProgress: TextView
     private lateinit var progressBar: ProgressBar
 
+    private lateinit var imgQuestion: ImageView
     private lateinit var layoutMcq: LinearLayout
     private lateinit var radioGroup: RadioGroup
     private lateinit var layoutShortAnswer: LinearLayout
     private lateinit var editTextAnswer: EditText
-    private lateinit var layoutFillBlank: LinearLayout
-    private lateinit var editTextFillBlank: EditText
+    private lateinit var layoutDescriptive: LinearLayout
+    private lateinit var editTextDescriptive: EditText
 
     private lateinit var btnPrevious: Button
     private lateinit var btnNext: Button
     private lateinit var btnSubmit: Button
     private lateinit var btnStartExam: Button
+    private lateinit var btnFlagQuestion: Button
 
     private lateinit var loadingLayout: LinearLayout
     private lateinit var errorLayout: LinearLayout
@@ -47,17 +58,25 @@ class ExamActivity : AppCompatActivity() {
 
     private lateinit var txtExamInfo: TextView
     private lateinit var txtExamResult: TextView
+    private lateinit var btnDownload: Button
 
-    // ------------ متغیرها ------------
-    private var currentQuestion: Question? = null
+    private lateinit var headerLayout: LinearLayout
+    private lateinit var chronometer: TextView
+
+    private lateinit var txtQuestionType: TextView
+    private lateinit var txtDifficulty: TextView
+    private lateinit var txtPoints: TextView
+
+    private var countDownTimer: CountDownTimer? = null
+    private var totalExamTimeMillis: Long = 45 * 60 * 1000 // 45 دقیقه پیش‌فرض
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_exam)
 
-        // دریافت ExamId از Intent
-        val examId = intent.getStringExtra("EXAM_ID")
-        if (examId.isNullOrEmpty()) {
+        // دریافت examId از Intent
+        val examId = intent.getIntExtra("EXAM_ID", -1)
+        if (examId == -1) {
             finish()
             return
         }
@@ -71,55 +90,91 @@ class ExamActivity : AppCompatActivity() {
     }
 
     private fun initViews() {
-        // TextViewها
-        txtExamTitle = findViewById(R.id.txtExamTitle)
-        txtQuestionNumber = findViewById(R.id.txtQuestionNumber)
-        txtQuestionText = findViewById(R.id.txtQuestionText)
-        txtTimer = findViewById(R.id.txtTimer)
+        // هدر
+        txtStudentName = findViewById(R.id.tvStudentName)
+        txtGrade = findViewById(R.id.tvGrade)
+        txtTeacherName = findViewById(R.id.tvTeacherName)
+        txtSubject = findViewById(R.id.tvSubject)
+        txtLevel = findViewById(R.id.tvLevel)
+        headerLayout = findViewById(R.id.headerLayout)
+        chronometer = findViewById(R.id.tvTimer)
+
+        // اطلاعات آزمون
+        txtExamTitle = findViewById(R.id.tvExamTitle)
+        txtQuestionNumber = findViewById(R.id.tvQuestionCounter)
+        txtQuestionText = findViewById(R.id.tvQuestionText)
+        txtTimer = findViewById(R.id.tvTimer)
         txtProgress = findViewById(R.id.txtProgress)
         progressBar = findViewById(R.id.progressBar)
 
-        // Layoutهای مختلف سوالات
-        layoutMcq = findViewById(R.id.layoutMcq)
+        // نوع و مشخصات سوال
+        txtQuestionType = findViewById(R.id.tvQuestionType)
+        txtDifficulty = findViewById(R.id.tvDifficulty)
+        txtPoints = findViewById(R.id.tvPoints)
+
+        // سوال و گزینه‌ها
+        imgQuestion = findViewById(R.id.imgQuestion)
+        layoutMcq = findViewById(R.id.optionsContainer)
         radioGroup = findViewById(R.id.radioGroup)
         layoutShortAnswer = findViewById(R.id.layoutShortAnswer)
         editTextAnswer = findViewById(R.id.editTextAnswer)
-        layoutFillBlank = findViewById(R.id.layoutFillBlank)
-        editTextFillBlank = findViewById(R.id.editTextFillBlank)
+        layoutDescriptive = findViewById(R.id.layoutDescriptive)
+        editTextDescriptive = findViewById(R.id.editTextDescriptive)
 
         // دکمه‌ها
         btnPrevious = findViewById(R.id.btnPrevious)
         btnNext = findViewById(R.id.btnNext)
         btnSubmit = findViewById(R.id.btnSubmit)
         btnStartExam = findViewById(R.id.btnStartExam)
+        btnFlagQuestion = findViewById(R.id.btnFlagQuestion)
+        btnDownload = findViewById(R.id.btnDownloadExam)
 
-        // Layoutهای وضعیت
+        // لایه‌های مختلف
         loadingLayout = findViewById(R.id.loadingLayout)
         errorLayout = findViewById(R.id.errorLayout)
         readyLayout = findViewById(R.id.readyLayout)
         examLayout = findViewById(R.id.examLayout)
         completedLayout = findViewById(R.id.completedLayout)
 
-        // سایر TextViewها
         txtExamInfo = findViewById(R.id.txtExamInfo)
         txtExamResult = findViewById(R.id.txtExamResult)
     }
 
     private fun setupObservers() {
-        // مشاهده وضعیت آزمون
+        // مشاهده وضعیت UI
         viewModel.uiState.observe(this) { state ->
-            updateUIForState(state)
+            when (state) {
+                is ExamViewModel.ExamUiState.Loading -> showLoading()
+                is ExamViewModel.ExamUiState.Ready -> showReady()
+                is ExamViewModel.ExamUiState.Active -> showActive()
+                is ExamViewModel.ExamUiState.Completed -> showCompleted(state.message)
+                is ExamViewModel.ExamUiState.Error -> showError(state.message)
+            }
         }
 
-        // مشاهده سوال جاری
+        // مشاهده داده‌های آزمون
+        viewModel.examData.observe(this) { exam ->
+            exam?.let {
+                updateExamInfo(it)
+                totalExamTimeMillis = it.durationMinutes * 60 * 1000L
+            }
+        }
+
+        // مشاهده سوالات
+        viewModel.questions.observe(this) { questions ->
+            if (questions.isNotEmpty()) {
+                updateQuestionNavigation()
+            }
+        }
+
+        // مشاهده سوال فعلی
         viewModel.currentQuestion.observe(this) { question ->
-            currentQuestion = question
             question?.let { showQuestion(it) }
         }
 
-        // مشاهده زمان باقیمانده
+        // مشاهده زمان باقی‌مانده
         viewModel.remainingTime.observe(this) { time ->
-            txtTimer.text = time?.let { formatTime(it) } ?: "--:--"
+            updateTimerDisplay(time)
         }
 
         // مشاهده پیشرفت
@@ -127,451 +182,360 @@ class ExamActivity : AppCompatActivity() {
             updateProgress(progress)
         }
 
+        // مشاهده تعداد سوالات پاسخ داده شده
+        viewModel.answeredCount.observe(this) { count ->
+            updateAnsweredCount(count)
+        }
+
         // مشاهده خطاها
         viewModel.errorMessage.observe(this) { error ->
-            error?.let {
-                showErrorToast(it)
-            }
+            error?.let { showErrorMessage(it) }
         }
     }
 
     private fun setupClickListeners() {
-        btnPrevious.setOnClickListener {
-            viewModel.goToPreviousQuestion()
-        }
+        // ناوبری بین سوالات
+        btnPrevious.setOnClickListener { viewModel.goToPreviousQuestion() }
+        btnNext.setOnClickListener { viewModel.goToNextQuestion() }
 
-        btnNext.setOnClickListener {
-            viewModel.goToNextQuestion()
-        }
-
-        btnSubmit.setOnClickListener {
-            viewModel.submitExam()
-        }
-
+        // شروع آزمون
         btnStartExam.setOnClickListener {
+            startExamTimer()
             viewModel.startExam()
         }
 
-        // رویدادهای RadioGroup برای سوالات MCQ
+        // ارسال آزمون
+        btnSubmit.setOnClickListener {
+            saveCurrentAnswer()
+            viewModel.submitExam()
+        }
+
+        // علامت‌گذاری سوال
+        btnFlagQuestion.setOnClickListener {
+            viewModel.toggleFlagCurrentQuestion()
+            updateFlagButton()
+        }
+
+        // دانلود آزمون (برای نسخه Pro)
+        btnDownload.setOnClickListener {
+            viewModel.downloadExam()
+        }
+
+        // انتخاب گزینه در سوالات چندگزینه‌ای
         radioGroup.setOnCheckedChangeListener { group, checkedId ->
             if (checkedId != -1) {
                 val selectedIndex = group.indexOfChild(findViewById(checkedId))
-                val answer = (selectedIndex + 1).toString()
-                viewModel.saveCurrentAnswer(answer)
+                val answer = ('A' + selectedIndex).toString()
+                viewModel.saveCurrentAnswer(selectedOption = answer)
             }
         }
 
-        // رویدادهای EditText برای سوالات تشریحی
+        // ذخیره پاسخ متنی هنگام از دست دادن فوکوس
         editTextAnswer.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
-                saveCurrentTextAnswer()
+                saveTextAnswer()
             }
         }
 
-        editTextFillBlank.setOnFocusChangeListener { _, hasFocus ->
+        editTextDescriptive.setOnFocusChangeListener { _, hasFocus ->
             if (!hasFocus) {
-                saveCurrentTextAnswer()
+                saveTextAnswer()
             }
         }
     }
 
-    private fun updateUIForState(state: ExamActivityUiState) {
-        // پنهان کردن همه Layoutها
-        loadingLayout.isVisible = false
+    private fun startExamTimer() {
+        countDownTimer?.cancel()
+
+        countDownTimer = object : CountDownTimer(totalExamTimeMillis, 1000) {
+            override fun onTick(millisUntilFinished: Long) {
+                val seconds = millisUntilFinished / 1000
+                viewModel.updateRemainingTime(seconds)
+                updateTimerDisplay(seconds)
+            }
+
+            override fun onFinish() {
+                viewModel.updateRemainingTime(0)
+                saveCurrentAnswer()
+                viewModel.submitExam()
+            }
+        }.start()
+
+        examLayout.isVisible = true
+        readyLayout.isVisible = false
+    }
+
+    private fun updateExamInfo(exam: ExamRemote) {
+        txtExamTitle.text = exam.title
+        txtSubject.text = "درس: ${exam.category?.name ?: "عمومی"}"
+        txtLevel.text = "زمان: ${exam.durationMinutes} دقیقه"
+
+        exam.description?.let {
+            findViewById<TextView>(R.id.tvExamDescription)?.text = it
+        }
+
+        // نمایش دکمه دانلود فقط برای نسخه Pro
+        btnDownload.isVisible = viewModel.repository.isProVersion()
+    }
+
+    private fun showQuestion(question: com.examapp.data.remote.QuestionRemote) {
+        txtQuestionNumber.text = "سوال ${viewModel.getCurrentQuestionNumber()} از ${viewModel.getTotalQuestions()}"
+        txtQuestionText.text = question.questionText
+
+        // نمایش نوع سوال
+        txtQuestionType.text = when (question.questionType) {
+            "multiple_choice" -> "چندگزینه‌ای"
+            "true_false" -> "صحیح/غلط"
+            "short_answer" -> "کوتاه‌پاسخ"
+            "descriptive" -> "تشریحی"
+            else -> "نامشخص"
+        }
+
+        // نمایش سختی و نمره
+        txtDifficulty.text = "سختی: متوسط"
+        txtPoints.text = "نمره: ${question.points}"
+
+        // پنهان کردن همه لایه‌های پاسخ
+        layoutMcq.isVisible = false
+        layoutShortAnswer.isVisible = false
+        layoutDescriptive.isVisible = false
+
+        // نمایش گزینه‌ها بر اساس نوع سوال
+        when (question.questionType) {
+            "multiple_choice", "true_false" -> showMultipleChoice(question)
+            "short_answer" -> showShortAnswer(question)
+            "descriptive" -> showDescriptive(question)
+        }
+
+        // نمایش وضعیت علامت‌گذاری
+        updateFlagButton()
+
+        // نمایش تصویر سوال (اگر وجود دارد)
+        // TODO: لود تصویر با Glide/Picasso
+    }
+
+    private fun showMultipleChoice(question: com.examapp.data.remote.QuestionRemote) {
+        layoutMcq.isVisible = true
+
+        // پاک کردن گزینه‌های قبلی
+        radioGroup.removeAllViews()
+
+        // ایجاد گزینه‌ها
+        question.options.forEachIndexed { index, option ->
+            val radioButton = RadioButton(this).apply {
+                id = View.generateViewId()
+                text = "${option.letter}. ${option.optionText}"
+                textSize = 16f
+                setPadding(32, 16, 32, 16)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    bottomMargin = 8
+                }
+            }
+            radioGroup.addView(radioButton)
+        }
+
+        // انتخاب گزینه قبلی کاربر (اگر وجود دارد)
+        val savedAnswer = viewModel.getSavedAnswer(question.id)
+        savedAnswer?.selectedOption?.let { answer ->
+            val index = answer.first().minus('A').toInt()
+            if (index in 0 until radioGroup.childCount) {
+                (radioGroup.getChildAt(index) as RadioButton).isChecked = true
+            }
+        }
+    }
+
+    private fun showShortAnswer(question: com.examapp.data.remote.QuestionRemote) {
+        layoutShortAnswer.isVisible = true
+
+        val savedAnswer = viewModel.getSavedAnswer(question.id)
+        editTextAnswer.setText(savedAnswer?.descriptiveAnswer ?: "")
+    }
+
+    private fun showDescriptive(question: com.examapp.data.remote.QuestionRemote) {
+        layoutDescriptive.isVisible = true
+
+        val savedAnswer = viewModel.getSavedAnswer(question.id)
+        editTextDescriptive.setText(savedAnswer?.descriptiveAnswer ?: "")
+    }
+
+    private fun saveCurrentAnswer() {
+        when {
+            layoutMcq.isVisible -> {
+                val checkedId = radioGroup.checkedRadioButtonId
+                if (checkedId != -1) {
+                    val selectedIndex = radioGroup.indexOfChild(findViewById(checkedId))
+                    val answer = ('A' + selectedIndex).toString()
+                    viewModel.saveCurrentAnswer(selectedOption = answer)
+                }
+            }
+            layoutShortAnswer.isVisible -> {
+                val answer = editTextAnswer.text.toString()
+                viewModel.saveCurrentAnswer(descriptiveAnswer = answer)
+            }
+            layoutDescriptive.isVisible -> {
+                val answer = editTextDescriptive.text.toString()
+                viewModel.saveCurrentAnswer(descriptiveAnswer = answer)
+            }
+        }
+    }
+
+    private fun saveTextAnswer() {
+        if (layoutShortAnswer.isVisible) {
+            val answer = editTextAnswer.text.toString()
+            viewModel.saveCurrentAnswer(descriptiveAnswer = answer)
+        } else if (layoutDescriptive.isVisible) {
+            val answer = editTextDescriptive.text.toString()
+            viewModel.saveCurrentAnswer(descriptiveAnswer = answer)
+        }
+    }
+
+    private fun updateTimerDisplay(seconds: Long) {
+        val minutes = TimeUnit.SECONDS.toMinutes(seconds)
+        val remainingSeconds = seconds - TimeUnit.MINUTES.toSeconds(minutes)
+        chronometer.text = String.format("%02d:%02d", minutes, remainingSeconds)
+
+        // تغییر رنگ هنگام اتمام زمان
+        if (seconds <= 300) { // 5 دقیقه پایانی
+            chronometer.setTextColor(resources.getColor(android.R.color.holo_red_dark, null))
+        }
+    }
+
+    private fun updateProgress(progress: Float) {
+        progressBar.progress = progress.toInt()
+        txtProgress.text = "${progress.toInt()}%"
+    }
+
+    private fun updateAnsweredCount(count: Int) {
+        findViewById<TextView>(R.id.tvAnsweredCount)?.text = "پاسخ داده شده: $count"
+    }
+
+    private fun updateFlagButton() {
+        val question = viewModel.currentQuestion.value ?: return
+        val savedAnswer = viewModel.getSavedAnswer(question.id)
+
+        if (savedAnswer?.isFlagged == true) {
+            btnFlagQuestion.text = "حذف علامت"
+            btnFlagQuestion.setCompoundDrawablesWithIntrinsicBounds(
+                R.drawable.ic_flag_filled, 0, 0, 0
+            )
+        } else {
+            btnFlagQuestion.text = "علامت‌گذاری"
+            btnFlagQuestion.setCompoundDrawablesWithIntrinsicBounds(
+                R.drawable.ic_flag_outline, 0, 0, 0
+            )
+        }
+    }
+
+    private fun updateQuestionNavigation() {
+        btnPrevious.isEnabled = !viewModel.isFirstQuestion()
+        btnNext.isEnabled = !viewModel.isLastQuestion()
+        btnNext.text = if (viewModel.isLastQuestion()) "پایان" else "بعدی"
+    }
+
+    // ==================== UI State Handlers ====================
+
+    private fun showLoading() {
+        loadingLayout.isVisible = true
         errorLayout.isVisible = false
         readyLayout.isVisible = false
         examLayout.isVisible = false
         completedLayout.isVisible = false
+    }
 
-        when (state) {
-            is ExamActivityUiState.Loading -> {
-                loadingLayout.isVisible = true
-                txtExamTitle.text = "در حال بارگذاری..."
-            }
+    private fun showReady() {
+        loadingLayout.isVisible = false
+        errorLayout.isVisible = false
+        readyLayout.isVisible = true
+        examLayout.isVisible = false
+        completedLayout.isVisible = false
 
-            is ExamActivityUiState.Ready -> {
-                readyLayout.isVisible = true
-                val exam = state.exam
-                val infoText = """
-                    آزمون: ${exam.title}
-                    تعداد سوالات: ${exam.totalQuestions}
-                    زمان: ${formatDuration(exam.examDuration)}
-                    درس: ${exam.subject} - پایه ${exam.grade}
-                    
-                    برای شروع آزمون روی دکمه زیر کلیک کنید.
-                """.trimIndent()
-
-                txtExamInfo.text = infoText
-                txtExamTitle.text = exam.title
-            }
-
-            is ExamActivityUiState.Active -> {
-                examLayout.isVisible = true
-                txtExamTitle.text = state.exam.title
-                updateNavigationButtons()
-            }
-
-            is ExamActivityUiState.Completed -> {
-                completedLayout.isVisible = true
-                val resultText = """
-                    آزمون تکمیل شد!
-                    
-                    نمره: ${state.score}/${state.totalScore}
-                    سوالات صحیح: ${state.correctAnswers}
-                    سوالات غلط: ${state.wrongAnswers}
-                    سوالات بی‌پاسخ: ${state.unanswered}
-                    
-                    ${if (state.isPassed) "🎉 قبول شدید!" else "📚 نیاز به مطالعه بیشتر دارید."}
-                """.trimIndent()
-
-                txtExamResult.text = resultText
-                txtExamTitle.text = state.exam.title
-            }
-
-            is ExamActivityUiState.Error -> {
-                errorLayout.isVisible = true
-                findViewById<TextView>(R.id.txtError).text = state.message
-            }
+        // نمایش اطلاعات آماده‌سازی
+        val exam = viewModel.examData.value
+        exam?.let {
+            findViewById<TextView>(R.id.tvReadyExamTitle).text = it.title
+            findViewById<TextView>(R.id.tvReadyQuestionCount).text = "تعداد سوالات: ${it.totalQuestions}"
+            findViewById<TextView>(R.id.tvReadyDuration).text = "زمان آزمون: ${it.durationMinutes} دقیقه"
         }
     }
 
-    private fun showQuestion(question: Question) {
-        // به‌روزرسانی شماره سوال
-        val totalQuestions = viewModel.totalQuestions.value ?: 0
-        val currentIndex = viewModel.currentQuestionIndex.value ?: 0
-        txtQuestionNumber.text = "سوال ${currentIndex + 1} از $totalQuestions"
+    private fun showActive() {
+        loadingLayout.isVisible = false
+        errorLayout.isVisible = false
+        readyLayout.isVisible = false
+        examLayout.isVisible = true
+        completedLayout.isVisible = false
 
-        // نمایش متن سوال
-        txtQuestionText.text = question.questionText
-
-        // پنهان کردن همه Layoutهای پاسخ
-        layoutMcq.isVisible = false
-        layoutShortAnswer.isVisible = false
-        layoutFillBlank.isVisible = false
-
-        // نمایش Layout مناسب بر اساس نوع سوال
-        when (question.questionType) {
-            "MCQ" -> showMCQQuestion(question)
-            "SHORT_ANSWER", "DESCRIPTIVE" -> showTextAnswerQuestion(question)
-            "FILL_BLANK" -> showFillBlankQuestion(question)
-            else -> {
-                // نوع سوال نامشخص
-                txtQuestionText.text = "نوع سوال پشتیبانی نمی‌شود: ${question.questionType}"
-            }
-        }
-
-        // به‌روزرسانی دکمه‌ها
-        updateNavigationButtons()
+        updateQuestionNavigation()
     }
 
-    private fun showMCQQuestion(question: Question) {
-        layoutMcq.isVisible = true
-        radioGroup.removeAllViews()
+    private fun showCompleted(message: String) {
+        loadingLayout.isVisible = false
+        errorLayout.isVisible = false
+        readyLayout.isVisible = false
+        examLayout.isVisible = false
+        completedLayout.isVisible = true
 
-        // بارگذاری گزینه‌ها
-        question.options?.let { options ->
-            options.forEachIndexed { i, option ->
-                val radioButton = RadioButton(this).apply {
-                    text = "${i + 1}) ${option.optionText}"
-                    id = View.generateViewId()
-                }
-                radioGroup.addView(radioButton)
-            }
+        txtExamResult.text = message
 
-            // انتخاب گزینه ذخیره شده
-            val savedAnswer = viewModel.getCurrentAnswer()
-            savedAnswer?.let {
-                val answerIndex = it.toIntOrNull() ?: 1
-                if (answerIndex - 1 in 0 until radioGroup.childCount) {
-                    val radioButton = radioGroup.getChildAt(answerIndex - 1) as RadioButton
-                    radioButton.isChecked = true
-                }
-            }
-        } ?: run {
-            // گزینه‌ها موجود نیستند
-            val textView = TextView(this).apply {
-                text = "گزینه‌ای برای این سوال تعریف نشده است."
-                setTextColor(resources.getColor(android.R.color.darker_gray, theme))
-            }
-            layoutMcq.addView(textView)
+        // نمایش دکمه رفتن به نتایج
+        findViewById<Button>(R.id.btnViewResults).setOnClickListener {
+            navigateToResults()
         }
     }
 
-    private fun showTextAnswerQuestion(question: Question) {
-        layoutShortAnswer.isVisible = true
-        editTextAnswer.setText("")
+    private fun showError(message: String) {
+        loadingLayout.isVisible = false
+        errorLayout.isVisible = true
+        readyLayout.isVisible = false
+        examLayout.isVisible = false
+        completedLayout.isVisible = false
 
-        // بارگذاری پاسخ ذخیره شده
-        val savedAnswer = viewModel.getCurrentAnswer()
-        savedAnswer?.let {
-            editTextAnswer.setText(it)
+        txtExamInfo.text = message
+
+        // دکمه تلاش مجدد
+        findViewById<Button>(R.id.btnRetry).setOnClickListener {
+            val examId = viewModel.currentExamId ?: return@setOnClickListener
+            viewModel.loadExam(examId)
         }
     }
 
-    private fun showFillBlankQuestion(question: Question) {
-        layoutFillBlank.isVisible = true
-        editTextFillBlank.setText("")
+    private fun showErrorMessage(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+    }
 
-        // بارگذاری پاسخ ذخیره شده
-        val savedAnswer = viewModel.getCurrentAnswer()
-        savedAnswer?.let {
-            editTextFillBlank.setText(it)
+    private fun navigateToResults() {
+        // انتقال به صفحه نتایج
+        val intent = Intent(this, ResultActivity::class.java).apply {
+            putExtra("EXAM_ID", viewModel.currentExamId)
         }
-    }
-
-    private fun saveCurrentTextAnswer() {
-        val answer = when {
-            layoutShortAnswer.isVisible -> editTextAnswer.text.toString().trim()
-            layoutFillBlank.isVisible -> editTextFillBlank.text.toString().trim()
-            else -> null
-        }
-
-        answer?.let {
-            if (it.isNotEmpty()) {
-                viewModel.saveCurrentAnswer(it)
-            }
-        }
-    }
-
-    private fun updateNavigationButtons() {
-        val currentIndex = viewModel.currentQuestionIndex.value ?: 0
-        val totalQuestions = viewModel.totalQuestions.value ?: 0
-
-        btnPrevious.isEnabled = currentIndex > 0
-        btnNext.isEnabled = currentIndex < totalQuestions - 1
-        btnSubmit.isVisible = currentIndex == totalQuestions - 1
-    }
-
-    private fun updateProgress(progress: Int) {
-        txtProgress.text = "$progress%"
-        progressBar.progress = progress
-    }
-
-    private fun showErrorToast(message: String) {
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
-    }
-
-    private fun formatTime(seconds: Long): String {
-        val minutes = seconds / 60
-        val remainingSeconds = seconds % 60
-        return String.format("%02d:%02d", minutes, remainingSeconds)
-    }
-
-    private fun formatDuration(minutes: Int?): String {
-        return minutes?.let { "$it دقیقه" } ?: "زمان نامشخص"
+        startActivity(intent)
+        finish()
     }
 
     override fun onBackPressed() {
-        when (viewModel.uiState.value) {
-            is ExamActivityUiState.Active -> {
-                // در حین آزمون، نمایش Dialog تایید
-                android.app.AlertDialog.Builder(this)
-                    .setTitle("خروج از آزمون")
-                    .setMessage("اگر خارج شوید، پیشرفت شما ذخیره خواهد شد اما آزمون متوقف می‌شود.")
-                    .setPositiveButton("خروج") { _, _ ->
-                        super.onBackPressed()
-                    }
-                    .setNegativeButton("ماندن", null)
-                    .show()
-            }
-            else -> {
-                super.onBackPressed()
-            }
-        }
-    }
-}
-
-// ViewModel for ExamActivity
-@dagger.hilt.android.lifecycle.HiltViewModel
-class ExamActivityViewModel @javax.inject.Inject constructor(
-    private val examRepository: com.examapp.data.repository.ExamRepository
-) : androidx.lifecycle.ViewModel() {
-
-    private val _uiState = androidx.lifecycle.MutableLiveData<ExamActivityUiState>(ExamActivityUiState.Loading)
-    val uiState: androidx.lifecycle.LiveData<ExamActivityUiState> = _uiState
-
-    private val _currentQuestion = androidx.lifecycle.MutableLiveData<Question?>()
-    val currentQuestion: androidx.lifecycle.LiveData<Question?> = _currentQuestion
-
-    private val _currentQuestionIndex = androidx.lifecycle.MutableLiveData<Int>(0)
-    val currentQuestionIndex: androidx.lifecycle.LiveData<Int> = _currentQuestionIndex
-
-    private val _totalQuestions = androidx.lifecycle.MutableLiveData<Int>(0)
-    val totalQuestions: androidx.lifecycle.LiveData<Int> = _totalQuestions
-
-    private val _remainingTime = androidx.lifecycle.MutableLiveData<Long?>()
-    val remainingTime: androidx.lifecycle.LiveData<Long?> = _remainingTime
-
-    private val _progress = androidx.lifecycle.MutableLiveData<Int>(0)
-    val progress: androidx.lifecycle.LiveData<Int> = _progress
-
-    private val _errorMessage = androidx.lifecycle.MutableLiveData<String?>()
-    val errorMessage: androidx.lifecycle.LiveData<String?> = _errorMessage
-
-    private var exam: com.examapp.data.models.Exam? = null
-    private var questions: List<Question> = emptyList()
-    private var userAnswers = mutableMapOf<String, String>()
-
-    fun loadExam(examId: String) {
-        viewModelScope.launch {
-            _uiState.value = ExamActivityUiState.Loading
-
-            try {
-                // Load exam details
-                val examResult = examRepository.getExamById(examId)
-                if (examResult.isFailure) {
-                    _uiState.value = ExamActivityUiState.Error(
-                        examResult.exceptionOrNull()?.message ?: "خطا در بارگذاری آزمون"
-                    )
-                    return@launch
+        if (examLayout.isVisible) {
+            // نمایش دیالوگ تایید خروج از آزمون
+            AlertDialog.Builder(this)
+                .setTitle("خروج از آزمون")
+                .setMessage("آیا مطمئن هستید که می‌خواهید از آزمون خارج شوید؟")
+                .setPositiveButton("بله") { _, _ ->
+                    super.onBackPressed()
                 }
-
-                exam = examResult.getOrNull()
-                if (exam == null) {
-                    _uiState.value = ExamActivityUiState.Error("آزمون یافت نشد")
-                    return@launch
-                }
-
-                // Load questions
-                val questionsResult = examRepository.getExamQuestions(examId)
-                if (questionsResult.isFailure) {
-                    _uiState.value = ExamActivityUiState.Error(
-                        questionsResult.exceptionOrNull()?.message ?: "خطا در بارگذاری سوالات"
-                    )
-                    return@launch
-                }
-
-                questions = questionsResult.getOrNull() ?: emptyList()
-                _totalQuestions.value = questions.size
-
-                _uiState.value = ExamActivityUiState.Ready(exam!!)
-
-            } catch (e: Exception) {
-                _uiState.value = ExamActivityUiState.Error("خطا در اتصال: ${e.message}")
-            }
-        }
-    }
-
-    fun startExam() {
-        if (questions.isEmpty()) {
-            _errorMessage.value = "سوالی برای شروع آزمون وجود ندارد"
-            return
-        }
-
-        _uiState.value = ExamActivityUiState.Active(exam!!)
-        _currentQuestion.value = questions[0]
-        _currentQuestionIndex.value = 0
-        _progress.value = 0
-
-        // Start timer if exam has duration
-        exam?.examDuration?.let { duration ->
-            _remainingTime.value = duration * 60L // Convert minutes to seconds
-        }
-    }
-
-    fun goToPreviousQuestion() {
-        val currentIndex = _currentQuestionIndex.value ?: 0
-        if (currentIndex > 0) {
-            _currentQuestionIndex.value = currentIndex - 1
-            _currentQuestion.value = questions[currentIndex - 1]
-            updateProgress()
-        }
-    }
-
-    fun goToNextQuestion() {
-        val currentIndex = _currentQuestionIndex.value ?: 0
-        if (currentIndex < questions.size - 1) {
-            _currentQuestionIndex.value = currentIndex + 1
-            _currentQuestion.value = questions[currentIndex + 1]
-            updateProgress()
-        }
-    }
-
-    fun saveCurrentAnswer(answer: String) {
-        val currentIndex = _currentQuestionIndex.value ?: 0
-        if (currentIndex < questions.size) {
-            val questionId = questions[currentIndex].id
-            userAnswers[questionId] = answer
-            updateProgress()
-        }
-    }
-
-    fun getCurrentAnswer(): String? {
-        val currentIndex = _currentQuestionIndex.value ?: 0
-        if (currentIndex < questions.size) {
-            val questionId = questions[currentIndex].id
-            return userAnswers[questionId]
-        }
-        return null
-    }
-
-    fun submitExam() {
-        viewModelScope.launch {
-            try {
-                val examId = exam?.id ?: run {
-                    _errorMessage.value = "آزمون یافت نشد"
-                    return@launch
-                }
-
-                // Prepare answers
-                val answers = questions.mapNotNull { question ->
-                    userAnswers[question.id]?.let { userAnswer ->
-                        mapOf(
-                            "questionId" to question.id,
-                            "answer" to userAnswer,
-                            "questionType" to question.questionType
-                        )
-                    }
-                }
-
-                // Submit exam
-                val submitResult = examRepository.submitExam(examId, answers)
-                if (submitResult.isSuccess) {
-                    val result = submitResult.getOrNull()
-                    _uiState.value = ExamActivityUiState.Completed(
-                        exam = exam!!,
-                        score = result?.score ?: 0,
-                        totalScore = result?.totalScore ?: 100,
-                        correctAnswers = result?.correctAnswers ?: 0,
-                        wrongAnswers = result?.wrongAnswers ?: 0,
-                        unanswered = questions.size - (result?.correctAnswers ?: 0) - (result?.wrongAnswers ?: 0),
-                        isPassed = result?.isPassed ?: false
-                    )
-                } else {
-                    _errorMessage.value = submitResult.exceptionOrNull()?.message ?: "خطا در ارسال آزمون"
-                }
-
-            } catch (e: Exception) {
-                _errorMessage.value = "خطا در ارسال آزمون: ${e.message}"
-            }
-        }
-    }
-
-    private fun updateProgress() {
-        val answeredCount = userAnswers.size
-        val total = questions.size
-        val progress = if (total > 0) {
-            (answeredCount.toFloat() / total * 100).toInt()
+                .setNegativeButton("خیر", null)
+                .show()
         } else {
-            0
+            super.onBackPressed()
         }
-        _progress.value = progress
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        countDownTimer?.cancel()
     }
 }
 
-// UI State classes
-sealed class ExamActivityUiState {
-    data object Loading : ExamActivityUiState()
-    data class Ready(val exam: com.examapp.data.models.Exam) : ExamActivityUiState()
-    data class Active(val exam: com.examapp.data.models.Exam) : ExamActivityUiState()
-    data class Completed(
-        val exam: com.examapp.data.models.Exam,
-        val score: Int,
-        val totalScore: Int,
-        val correctAnswers: Int,
-        val wrongAnswers: Int,
-        val unanswered: Int,
-        val isPassed: Boolean
-    ) : ExamActivityUiState()
-    data class Error(val message: String) : ExamActivityUiState()
-}
+// برای دیالوگ تایید
+import androidx.appcompat.app.AlertDialog

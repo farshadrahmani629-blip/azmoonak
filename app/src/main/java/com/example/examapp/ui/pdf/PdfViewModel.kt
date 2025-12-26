@@ -2,20 +2,20 @@
 package com.examapp.ui.pdf
 
 import android.content.Context
-import android.os.Environment
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.examapp.data.models.Result
 import com.examapp.data.repository.ResultRepository
+import com.examapp.ui.exam.pdf.StorageConfig
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
+import java.util.*
 
 /**
  * ViewModel برای مدیریت عملیات PDF
@@ -40,38 +40,51 @@ class PdfViewModel(
     private val _pdfContent = MutableLiveData<String>()
     val pdfContent: LiveData<String> = _pdfContent
 
+    private val _currentPdfTitle = MutableLiveData<String>("گزارش")
+    val currentPdfTitle: LiveData<String> = _currentPdfTitle
+
     /**
      * ایجاد PDF برای یک نتیجه خاص
      */
     fun generateSingleResultPdf(context: Context, resultId: Int) {
-        _isGeneratingPdf.value = true
-        _pdfGenerationProgress.value = 10
-
         viewModelScope.launch {
             try {
+                _isGeneratingPdf.value = true
+                _errorMessage.value = null
+                _currentPdfTitle.value = "گزارش نتیجه"
+
+                // شبیه‌سازی پیشرفت
+                simulateProgress(10)
+
                 // بارگذاری نتیجه از دیتابیس
                 val result = withContext(Dispatchers.IO) {
                     resultRepository.getResultById(resultId)
                 }
 
-                _pdfGenerationProgress.value = 30
+                simulateProgress(30)
 
                 // ایجاد محتوای PDF
                 val pdfContentText = createSingleResultPdfContent(result)
                 _pdfContent.value = pdfContentText
 
-                _pdfGenerationProgress.value = 50
+                simulateProgress(50)
 
-                // ذخیره PDF در فایل
-                val filePath = savePdfToFile(context, pdfContentText, "result_${result.id}")
+                // ذخیره PDF در فایل با StorageConfig
+                val filePath = savePdfWithStorageConfig(
+                    context = context,
+                    htmlContent = pdfContentText,
+                    result = result,
+                    isAllResults = false
+                )
 
-                _pdfGenerationProgress.value = 80
+                simulateProgress(80)
 
                 // به‌روزرسانی مسیر فایل
                 _pdfFilePath.value = filePath
-                _errorMessage.value = null
+                _currentPdfTitle.value = result.examTitle ?: "گزارش نتیجه"
 
-                _pdfGenerationProgress.value = 100
+                simulateProgress(100)
+                delay(300) // تأخیر برای نمایش 100%
 
             } catch (e: Exception) {
                 _errorMessage.value = "خطا در ایجاد PDF: ${e.message}"
@@ -85,17 +98,21 @@ class PdfViewModel(
      * ایجاد PDF برای همه نتایج
      */
     fun generateAllResultsPdf(context: Context) {
-        _isGeneratingPdf.value = true
-        _pdfGenerationProgress.value = 10
-
         viewModelScope.launch {
             try {
+                _isGeneratingPdf.value = true
+                _errorMessage.value = null
+                _currentPdfTitle.value = "گزارش کلی نتایج"
+
+                // شبیه‌سازی پیشرفت
+                simulateProgress(10)
+
                 // بارگذاری همه نتایج
                 val allResults = withContext(Dispatchers.IO) {
                     resultRepository.getAllResults()
                 }
 
-                _pdfGenerationProgress.value = 30
+                simulateProgress(30)
 
                 if (allResults.isEmpty()) {
                     _errorMessage.value = "هیچ نتیجه‌ای برای ایجاد PDF وجود ندارد"
@@ -107,18 +124,23 @@ class PdfViewModel(
                 val pdfContentText = createAllResultsPdfContent(allResults)
                 _pdfContent.value = pdfContentText
 
-                _pdfGenerationProgress.value = 50
+                simulateProgress(50)
 
-                // ذخیره PDF در فایل
-                val filePath = savePdfToFile(context, pdfContentText, "all_results_${System.currentTimeMillis()}")
+                // ذخیره PDF در فایل با StorageConfig
+                val filePath = savePdfWithStorageConfig(
+                    context = context,
+                    htmlContent = pdfContentText,
+                    results = allResults,
+                    isAllResults = true
+                )
 
-                _pdfGenerationProgress.value = 80
+                simulateProgress(80)
 
                 // به‌روزرسانی مسیر فایل
                 _pdfFilePath.value = filePath
-                _errorMessage.value = null
 
-                _pdfGenerationProgress.value = 100
+                simulateProgress(100)
+                delay(300)
 
             } catch (e: Exception) {
                 _errorMessage.value = "خطا در ایجاد PDF: ${e.message}"
@@ -129,7 +151,120 @@ class PdfViewModel(
     }
 
     /**
-     * ایجاد محتوای PDF برای یک نتیجه
+     * ایجاد PDF ساده (برای تست)
+     */
+    fun generateSimplePdf(context: Context, title: String, content: String) {
+        viewModelScope.launch {
+            try {
+                _isGeneratingPdf.value = true
+                _errorMessage.value = null
+                _currentPdfTitle.value = title
+
+                simulateProgress(10)
+
+                // تولید محتوای HTML ساده
+                val htmlContent = """
+                    <html dir="rtl" lang="fa">
+                    <head><meta charset="UTF-8"><title>$title</title></head>
+                    <body style="font-family: Tahoma; padding: 20px;">
+                        <h1 style="color: #6200EE;">$title</h1>
+                        <p style="font-size: 16px; line-height: 1.8;">$content</p>
+                        <p style="color: #757575; margin-top: 30px;">
+                            تاریخ ایجاد: ${getCurrentDateTime()}
+                        </p>
+                    </body>
+                    </html>
+                """.trimIndent()
+
+                _pdfContent.value = htmlContent
+
+                simulateProgress(50)
+
+                // ذخیره فایل
+                val filePath = StorageConfig.getResultPdfPath(
+                    context = context,
+                    examTitle = title,
+                    studentName = "کاربر",
+                    score = 0f
+                )
+
+                val file = File(filePath)
+                file.parentFile?.mkdirs()
+                file.writeText(htmlContent, Charsets.UTF_8)
+
+                _pdfFilePath.value = filePath
+
+                simulateProgress(100)
+                delay(300)
+
+            } catch (e: Exception) {
+                _errorMessage.value = "خطا در ایجاد PDF: ${e.message}"
+            } finally {
+                _isGeneratingPdf.value = false
+            }
+        }
+    }
+
+    /**
+     * ذخیره PDF با استفاده از StorageConfig
+     */
+    private suspend fun savePdfWithStorageConfig(
+        context: Context,
+        htmlContent: String,
+        result: Result? = null,
+        results: List<Result>? = null,
+        isAllResults: Boolean = false
+    ): String = withContext(Dispatchers.IO) {
+
+        val filePath = if (isAllResults && results != null) {
+            // ذخیره گزارش کلی
+            val averageScore = results.map { it.score }.average().toFloat()
+            StorageConfig.getResultPdfPath(
+                context = context,
+                examTitle = "گزارش کلی نتایج",
+                studentName = "کاربر",
+                score = averageScore
+            )
+        } else if (result != null) {
+            // ذخیره گزارش تک‌آزمون
+            StorageConfig.getResultPdfPath(
+                context = context,
+                examTitle = result.examTitle ?: "گزارش آزمون",
+                studentName = "دانش‌آموز",
+                score = result.score
+            )
+        } else {
+            // ذخیره عمومی
+            StorageConfig.getExamPdfPath(
+                context = context,
+                examTitle = "گزارش",
+                studentName = "کاربر"
+            )
+        }
+
+        val file = File(filePath)
+        file.parentFile?.mkdirs()
+        file.writeText(htmlContent, Charsets.UTF_8)
+
+        return@withContext filePath
+    }
+
+    /**
+     * شبیه‌سازی پیشرفت
+     */
+    private suspend fun simulateProgress(targetProgress: Int) {
+        val current = _pdfGenerationProgress.value ?: 0
+        if (targetProgress > current) {
+            for (i in current..targetProgress step 5) {
+                delay(50)
+                _pdfGenerationProgress.value = i
+            }
+        }
+        _pdfGenerationProgress.value = targetProgress
+    }
+
+    /**
+     * ایجاد محتوای PDF برای یک نتیجه (کد اصلی شما)
      */
     private fun createSingleResultPdfContent(result: Result): String {
         val dateFormat = SimpleDateFormat("yyyy/MM/dd - HH:mm", Locale("fa", "IR"))
@@ -224,7 +359,7 @@ class PdfViewModel(
                 
                 <div class="footer">
                     <p>این گزارش به صورت خودکار توسط اپلیکیشن ExamApp ایجاد شده است.</p>
-                    <p>تاریخ ایجاد: ${SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale("fa", "IR")).format(Date())}</p>
+                    <p>تاریخ ایجاد: ${getCurrentDateTime()}</p>
                 </div>
             </body>
             </html>
@@ -232,7 +367,7 @@ class PdfViewModel(
     }
 
     /**
-     * ایجاد محتوای PDF برای همه نتایج
+     * ایجاد محتوای PDF برای همه نتایج (کد اصلی شما)
      */
     private fun createAllResultsPdfContent(results: List<Result>): String {
         val dateFormat = SimpleDateFormat("yyyy/MM/dd - HH:mm", Locale("fa", "IR"))
@@ -340,7 +475,7 @@ class PdfViewModel(
                 
                 <div class="footer">
                     <p>این گزارش شامل ${results.size} نتیجه آزمون می‌باشد.</p>
-                    <p>تاریخ ایجاد: ${SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale("fa", "IR")).format(Date())}</p>
+                    <p>تاریخ ایجاد: ${getCurrentDateTime()}</p>
                     <p>اپلیکیشن ExamApp - فارسی پایه چهارم</p>
                 </div>
             </body>
@@ -349,7 +484,7 @@ class PdfViewModel(
     }
 
     /**
-     * ایجاد جدول پاسخ‌ها
+     * ایجاد جدول پاسخ‌ها (کد اصلی شما)
      */
     private fun createAnswersTable(result: Result): String {
         val userAnswers = result.userAnswers ?: emptyMap()
@@ -388,31 +523,7 @@ class PdfViewModel(
     }
 
     /**
-     * ذخیره PDF در فایل
-     */
-    private suspend fun savePdfToFile(context: Context, htmlContent: String, fileName: String): String {
-        return withContext(Dispatchers.IO) {
-            // ایجاد پوشه ذخیره‌سازی
-            val downloadsDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
-            val appDir = File(downloadsDir, "ExamApp")
-            if (!appDir.exists()) {
-                appDir.mkdirs()
-            }
-
-            // ایجاد فایل PDF
-            val timestamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.getDefault()).format(Date())
-            val pdfFile = File(appDir, "${fileName}_${timestamp}.html") // فعلاً HTML، بعداً به PDF تبدیل می‌کنیم
-
-            // نوشتن محتوا در فایل
-            pdfFile.writeText(htmlContent, Charsets.UTF_8)
-
-            // بازگشت مسیر فایل
-            pdfFile.absolutePath
-        }
-    }
-
-    /**
-     * ارزیابی عملکرد بر اساس نمره
+     * ارزیابی عملکرد بر اساس نمره (کد اصلی شما)
      */
     private fun getPerformanceEvaluation(score: Float): String {
         return when {
@@ -424,7 +535,7 @@ class PdfViewModel(
     }
 
     /**
-     * پیشنهاد بهبود
+     * پیشنهاد بهبود (کد اصلی شما)
      */
     private fun getImprovementSuggestion(score: Float): String {
         return when {
@@ -436,7 +547,7 @@ class PdfViewModel(
     }
 
     /**
-     * تحلیل کلی عملکرد
+     * تحلیل کلی عملکرد (کد اصلی شما)
      */
     private fun getOverallPerformanceAnalysis(results: List<Result>): String {
         if (results.isEmpty()) return "هیچ داده‌ای برای تحلیل وجود ندارد."
@@ -458,6 +569,20 @@ class PdfViewModel(
     }
 
     /**
+     * گرفتن تاریخ و زمان فعلی
+     */
+    private fun getCurrentDateTime(): String {
+        return SimpleDateFormat("yyyy/MM/dd HH:mm:ss", Locale("fa", "IR")).format(Date())
+    }
+
+    /**
+     * تنظیم مسیر فایل PDF
+     */
+    fun setPdfFilePath(filePath: String) {
+        _pdfFilePath.value = filePath
+    }
+
+    /**
      * پاک کردن حالت
      */
     fun clearState() {
@@ -465,5 +590,22 @@ class PdfViewModel(
         _errorMessage.value = null
         _pdfContent.value = ""
         _pdfGenerationProgress.value = 0
+        _currentPdfTitle.value = "گزارش"
+    }
+}
+
+/**
+ * Factory برای PdfViewModel
+ */
+class PdfViewModelFactory(
+    private val repository: ResultRepository
+) : androidx.lifecycle.ViewModelProvider.Factory {
+
+    @Suppress("UNCHECKED_CAST")
+    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T {
+        if (modelClass.isAssignableFrom(PdfViewModel::class.java)) {
+            return PdfViewModel(repository) as T
+        }
+        throw IllegalArgumentException("Unknown ViewModel class")
     }
 }

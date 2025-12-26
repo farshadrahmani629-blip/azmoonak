@@ -6,6 +6,7 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.examapp.App
 import com.examapp.data.local.converters.*
 import com.examapp.data.local.dao.*
 import com.examapp.data.models.local.*

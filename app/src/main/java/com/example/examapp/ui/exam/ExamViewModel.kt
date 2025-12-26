@@ -1,261 +1,404 @@
-// app/src/main/java/com/examapp/ui/exam/ExamViewModel.kt
 package com.examapp.ui.exam
 
+import androidx.lifecycle.LiveData
+import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.examapp.data.models.*
+import com.examapp.data.remote.*
 import com.examapp.data.repository.ExamRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import timber.log.Timber
 import javax.inject.Inject
 
 @HiltViewModel
 class ExamViewModel @Inject constructor(
-    private val examRepository: ExamRepository
+    private val repository: ExamRepository
 ) : ViewModel() {
 
-    private val _examsState = MutableStateFlow<ExamsState>(ExamsState.Loading)
-    val examsState: StateFlow<ExamsState> = _examsState.asStateFlow()
-
-    private val _examGenerationState = MutableStateFlow<ExamGenerationState>(ExamGenerationState.Idle)
-    val examGenerationState: StateFlow<ExamGenerationState> = _examGenerationState.asStateFlow()
-
-    private val _currentExam = MutableStateFlow<Exam?>(null)
-    val currentExam: StateFlow<Exam?> = _currentExam.asStateFlow()
-
-    private val _examQuestions = MutableStateFlow<List<Question>>(emptyList())
-    val examQuestions: StateFlow<List<Question>> = _examQuestions.asStateFlow()
-
-    private val _examResults = MutableStateFlow<ExamResultsState>(ExamResultsState.Loading)
-    val examResults: StateFlow<ExamResultsState> = _examResults.asStateFlow()
-
-    private val _examFilter = MutableStateFlow<ExamStatus?>(null)
-    val examFilter: StateFlow<ExamStatus?> = _examFilter.asStateFlow()
-
-    private val _userAnswers = MutableStateFlow<Map<String, String>>(emptyMap())
-    val userAnswers: StateFlow<Map<String, String>> = _userAnswers.asStateFlow()
-
-    init {
-        loadUserExams()
-        loadUserResults()
+    // ==================== UI State ====================
+    sealed class ExamUiState {
+        object Loading : ExamUiState()
+        object Ready : ExamUiState()
+        object Active : ExamUiState()
+        data class Completed(val message: String) : ExamUiState()
+        data class Error(val message: String) : ExamUiState()
     }
 
-    fun loadUserExams(status: ExamStatus? = null) {
+    private val _uiState = MutableLiveData<ExamUiState>(ExamUiState.Loading)
+    val uiState: LiveData<ExamUiState> = _uiState
+
+    // ==================== Data ====================
+    private val _examData = MutableLiveData<ExamRemote?>()
+    val examData: LiveData<ExamRemote?> = _examData
+
+    private val _questions = MutableLiveData<List<QuestionRemote>>(emptyList())
+    val questions: LiveData<List<QuestionRemote>> = _questions
+
+    private val _currentQuestion = MutableLiveData<QuestionRemote?>()
+    val currentQuestion: LiveData<QuestionRemote?> = _currentQuestion
+
+    // ==================== Exam State ====================
+    private val _remainingTime = MutableLiveData<Long>(0L)
+    val remainingTime: LiveData<Long> = _remainingTime
+
+    private val _progress = MutableLiveData<Float>(0f)
+    val progress: LiveData<Float> = _progress
+
+    private val _answeredCount = MutableLiveData<Int>(0)
+    val answeredCount: LiveData<Int> = _answeredCount
+
+    private val _errorMessage = MutableLiveData<String?>()
+    val errorMessage: LiveData<String?> = _errorMessage
+
+    // ==================== Local State ====================
+    private var currentQuestionIndex = 0
+    private var currentExamId: Int? = null
+    private val userAnswers = mutableMapOf<Int, UserAnswerRemote>()
+    private var isExamStarted = false
+    private var examStartTime: Long = 0
+
+    // ==================== Public Methods ====================
+
+    /**
+     * بارگذاری آزمون بر اساس ID
+     */
+    fun loadExam(examId: Int) {
+        currentExamId = examId
         viewModelScope.launch {
             try {
-                _examsState.value = ExamsState.Loading
-                _examFilter.value = status
+                _uiState.value = ExamUiState.Loading
 
-                // Get user ID from AuthRepository
-                val userId = getCurrentUserId()
-                if (userId == null) {
-                    _examsState.value = ExamsState.Error("لطفاً وارد شوید")
-                    return@launch
-                }
+                // 1. دریافت اطلاعات آزمون
+                when (val examResult = repository.getExamById(examId)) {
+                    is Result.Success -> {
+                        _examData.value = examResult.data
 
-                val result = examRepository.getUserExams(userId, status)
+                        // 2. دریافت سوالات آزمون
+                        when (val questionsResult = repository.getExamQuestions(examId)) {
+                            is Result.Success -> {
+                                val questionsList = questionsResult.data
+                                _questions.value = questionsList
 
-                if (result.isSuccess) {
-                    val exams = result.getOrNull() ?: emptyList()
-                    _examsState.value = ExamsState.Success(exams)
-                } else {
-                    _examsState.value = ExamsState.Error(
-                        result.exceptionOrNull()?.message ?: "خطا در دریافت آزمون‌ها"
-                    )
+                                if (questionsList.isNotEmpty()) {
+                                    _currentQuestion.value = questionsList[0]
+                                    updateProgress()
+                                    _uiState.value = ExamUiState.Ready
+                                } else {
+                                    _errorMessage.value = "آزمون سوالی ندارد"
+                                    _uiState.value = ExamUiState.Error("آزمون سوالی ندارد")
+                                }
+                            }
+                            is Result.Failure -> {
+                                _errorMessage.value = "خطا در دریافت سوالات: ${questionsResult.exception.message}"
+                                _uiState.value = ExamUiState.Error("خطا در دریافت سوالات")
+                            }
+                        }
+                    }
+                    is Result.Failure -> {
+                        _errorMessage.value = "خطا در دریافت آزمون: ${examResult.exception.message}"
+                        _uiState.value = ExamUiState.Error("خطا در دریافت آزمون")
+                    }
                 }
             } catch (e: Exception) {
-                _examsState.value = ExamsState.Error("خطا در اتصال: ${e.message}")
+                Timber.e(e, "خطا در بارگذاری آزمون")
+                _errorMessage.value = "خطا در بارگذاری آزمون: ${e.message}"
+                _uiState.value = ExamUiState.Error("خطا در بارگذاری آزمون")
             }
         }
     }
 
-    fun generateExam(request: ExamRequest) {
+    /**
+     * شروع آزمون
+     */
+    fun startExam() {
+        isExamStarted = true
+        examStartTime = System.currentTimeMillis()
+        _uiState.value = ExamUiState.Active
+
+        // شروع تایمر
+        startTimer()
+    }
+
+    /**
+     * رفتن به سوال بعدی
+     */
+    fun goToNextQuestion() {
+        val currentQuestions = _questions.value ?: return
+        if (currentQuestionIndex < currentQuestions.size - 1) {
+            currentQuestionIndex++
+            _currentQuestion.value = currentQuestions[currentQuestionIndex]
+            updateProgress()
+        }
+    }
+
+    /**
+     * رفتن به سوال قبلی
+     */
+    fun goToPreviousQuestion() {
+        if (currentQuestionIndex > 0) {
+            currentQuestionIndex--
+            val currentQuestions = _questions.value ?: return
+            _currentQuestion.value = currentQuestions[currentQuestionIndex]
+            updateProgress()
+        }
+    }
+
+    /**
+     * رفتن به سوال مشخص
+     */
+    fun goToQuestion(index: Int) {
+        val currentQuestions = _questions.value ?: return
+        if (index in currentQuestions.indices) {
+            currentQuestionIndex = index
+            _currentQuestion.value = currentQuestions[index]
+            updateProgress()
+        }
+    }
+
+    /**
+     * ذخیره پاسخ سوال فعلی
+     */
+    fun saveCurrentAnswer(selectedOption: String? = null, descriptiveAnswer: String? = null) {
+        val question = _currentQuestion.value ?: return
+
+        val answer = UserAnswerRemote(
+            questionId = question.id,
+            selectedOption = selectedOption,
+            descriptiveAnswer = descriptiveAnswer,
+            isFlagged = false
+        )
+
+        userAnswers[question.id] = answer
+        updateProgress()
+    }
+
+    /**
+     * علامت‌گذاری سوال فعلی
+     */
+    fun toggleFlagCurrentQuestion() {
+        val question = _currentQuestion.value ?: return
+        val currentAnswer = userAnswers[question.id]
+
+        val updatedAnswer = UserAnswerRemote(
+            questionId = question.id,
+            selectedOption = currentAnswer?.selectedOption,
+            descriptiveAnswer = currentAnswer?.descriptiveAnswer,
+            isFlagged = currentAnswer?.isFlagged != true
+        )
+
+        userAnswers[question.id] = updatedAnswer
+    }
+
+    /**
+     * ارسال آزمون
+     */
+    fun submitExam() {
+        val examId = currentExamId ?: return
+        val answers = userAnswers.values.toList()
+        val timeSpentSeconds = calculateTimeSpent()
+
         viewModelScope.launch {
             try {
-                _examGenerationState.value = ExamGenerationState.Loading
+                _uiState.value = ExamUiState.Loading
 
-                val result = examRepository.generateExam(request)
+                when (val result = repository.submitExam(examId, answers, timeSpentSeconds)) {
+                    is Result.Success -> {
+                        val submitResponse = result.data
+                        _uiState.value = ExamUiState.Completed(
+                            "آزمون با موفقیت ثبت شد. نمره شما: ${submitResponse.score}/${submitResponse.totalScore}"
+                        )
 
-                if (result.isSuccess) {
-                    val exam = result.getOrNull()
-                    _currentExam.value = exam
-                    _examGenerationState.value = ExamGenerationState.Success(exam)
-                } else {
-                    _examGenerationState.value = ExamGenerationState.Error(
-                        result.exceptionOrNull()?.message ?: "خطا در ایجاد آزمون"
-                    )
+                        // برای نسخه Pro: تولید PDF
+                        if (repository.isProVersion()) {
+                            generateResultPdf(submitResponse)
+                        }
+                    }
+                    is Result.Failure -> {
+                        _errorMessage.value = "خطا در ثبت آزمون: ${result.exception.message}"
+                        _uiState.value = ExamUiState.Error("خطا در ثبت آزمون")
+                    }
                 }
             } catch (e: Exception) {
-                _examGenerationState.value = ExamGenerationState.Error("خطا در اتصال: ${e.message}")
+                Timber.e(e, "خطا در ثبت آزمون")
+                _errorMessage.value = "خطا در ثبت آزمون: ${e.message}"
+                _uiState.value = ExamUiState.Error("خطا در ثبت آزمون")
             }
         }
     }
 
-    fun startExam(examId: String) {
+    /**
+     * دانلود آزمون (برای نسخه Pro)
+     */
+    fun downloadExam() {
+        val examId = currentExamId ?: return
+
+        if (!repository.isProVersion()) {
+            _errorMessage.value = "فقط نسخه Pro امکان دانلود دارد"
+            return
+        }
+
         viewModelScope.launch {
             try {
-                val result = examRepository.startExam(examId)
+                _uiState.value = ExamUiState.Loading
 
-                if (result.isSuccess) {
-                    val exam = result.getOrNull()
-                    _currentExam.value = exam
-                    loadExamQuestions(examId)
+                when (val result = repository.downloadExam(examId)) {
+                    is Result.Success -> {
+                        if (result.data) {
+                            _errorMessage.value = "آزمون با موفقیت دانلود شد"
+                        }
+                    }
+                    is Result.Failure -> {
+                        _errorMessage.value = "خطا در دانلود: ${result.exception.message}"
+                    }
                 }
             } catch (e: Exception) {
-                // Handle error
+                Timber.e(e, "خطا در دانلود آزمون")
+                _errorMessage.value = "خطا در دانلود: ${e.message}"
+            } finally {
+                // بازگشت به حالت قبلی
+                val currentState = _uiState.value
+                if (currentState is ExamUiState.Loading) {
+                    _uiState.value = ExamUiState.Ready
+                }
             }
         }
     }
 
-    fun loadExamQuestions(examId: String) {
+    /**
+     * تولید PDF نتیجه
+     */
+    private fun generateResultPdf(submitResponse: SubmitExamResponse) {
         viewModelScope.launch {
             try {
-                val result = examRepository.getExamQuestions(examId)
+                val exam = _examData.value ?: return@launch
 
-                if (result.isSuccess) {
-                    _examQuestions.value = result.getOrNull() ?: emptyList()
+                when (val result = repository.generateAnswerSheetPdf(exam, submitResponse)) {
+                    is Result.Success -> {
+                        Timber.d("PDF نتیجه با موفقیت ایجاد شد: ${result.data.path}")
+                    }
+                    is Result.Failure -> {
+                        Timber.e(result.exception, "خطا در ایجاد PDF نتیجه")
+                    }
                 }
             } catch (e: Exception) {
-                // Handle error
+                Timber.e(e, "خطا در تولید PDF")
             }
         }
     }
 
-    fun submitExam(answers: List<StudentAnswer>) {
-        viewModelScope.launch {
-            try {
-                val examId = _currentExam.value?.id ?: run {
-                    _examGenerationState.value = ExamGenerationState.Error("آزمون انتخاب نشده")
-                    return@launch
-                }
+    // ==================== Helper Methods ====================
 
-                val result = examRepository.submitExam(examId, answers)
+    /**
+     * شروع تایمر
+     */
+    private fun startTimer() {
+        // اینجا می‌توانید از Timer یا Coroutine timer استفاده کنید
+        // برای سادگی، فقط یک نمونه ساده:
+        val examDuration = _examData.value?.durationMinutes ?: 60
+        val totalSeconds = examDuration * 60L
+        _remainingTime.value = totalSeconds
+    }
 
-                if (result.isSuccess) {
-                    val examResult = result.getOrNull()
-                    _examGenerationState.value = ExamGenerationState.Submitted(examResult)
-                    loadUserResults() // Refresh results
-                } else {
-                    _examGenerationState.value = ExamGenerationState.Error(
-                        result.exceptionOrNull()?.message ?: "خطا در ثبت آزمون"
-                    )
-                }
-            } catch (e: Exception) {
-                _examGenerationState.value = ExamGenerationState.Error("خطا در اتصال: ${e.message}")
-            }
+    /**
+     * محاسبه زمان سپری شده
+     */
+    private fun calculateTimeSpent(): Int {
+        return if (examStartTime > 0) {
+            ((System.currentTimeMillis() - examStartTime) / 1000).toInt()
+        } else {
+            0
         }
     }
 
-    fun loadUserResults() {
-        viewModelScope.launch {
-            try {
-                _examResults.value = ExamResultsState.Loading
+    /**
+     * به‌روزرسانی پیشرفت
+     */
+    private fun updateProgress() {
+        val currentQuestions = _questions.value ?: emptyList()
+        val totalQuestions = currentQuestions.size
+        val answered = userAnswers.size
 
-                val userId = getCurrentUserId()
-                if (userId == null) {
-                    _examResults.value = ExamResultsState.Error("لطفاً وارد شوید")
-                    return@launch
-                }
-
-                val result = examRepository.getUserResults(userId)
-
-                if (result.isSuccess) {
-                    val results = result.getOrNull() ?: emptyList()
-                    _examResults.value = ExamResultsState.Success(results)
-                } else {
-                    _examResults.value = ExamResultsState.Error(
-                        result.exceptionOrNull()?.message ?: "خطا در دریافت نتایج"
-                    )
-                }
-            } catch (e: Exception) {
-                _examResults.value = ExamResultsState.Error("خطا در اتصال: ${e.message}")
-            }
+        if (totalQuestions > 0) {
+            _progress.value = (answered.toFloat() / totalQuestions) * 100
+            _answeredCount.value = answered
+        } else {
+            _progress.value = 0f
+            _answeredCount.value = 0
         }
     }
 
-    fun getExamByCode(examCode: String) {
-        viewModelScope.launch {
-            try {
-                val result = examRepository.getExamByCode(examCode)
-
-                if (result.isSuccess) {
-                    _currentExam.value = result.getOrNull()
-                }
-            } catch (e: Exception) {
-                // Handle error
-            }
+    /**
+     * دریافت وضعیت پاسخ سوال
+     */
+    fun getQuestionStatus(questionId: Int): String {
+        return when {
+            userAnswers.containsKey(questionId) -> "پاسخ داده شده"
+            userAnswers[questionId]?.isFlagged == true -> "علامت‌گذاری شده"
+            else -> "بی‌پاسخ"
         }
     }
 
-    fun clearCurrentExam() {
-        _currentExam.value = null
-        _examQuestions.value = emptyList()
-        _examGenerationState.value = ExamGenerationState.Idle
-        _userAnswers.value = emptyMap()
+    /**
+     * دریافت پاسخ ذخیره شده برای سوال
+     */
+    fun getSavedAnswer(questionId: Int): UserAnswerRemote? {
+        return userAnswers[questionId]
     }
 
-    fun refreshExams() {
-        loadUserExams(_examFilter.value)
+    /**
+     * بررسی آیا سوال آخر است
+     */
+    fun isLastQuestion(): Boolean {
+        val currentQuestions = _questions.value ?: return false
+        return currentQuestionIndex == currentQuestions.size - 1
     }
 
-    fun refreshResults() {
-        loadUserResults()
+    /**
+     * بررسی آیا سوال اول است
+     */
+    fun isFirstQuestion(): Boolean = currentQuestionIndex == 0
+
+    /**
+     * دریافت شماره سوال فعلی
+     */
+    fun getCurrentQuestionNumber(): Int = currentQuestionIndex + 1
+
+    /**
+     * دریافت تعداد کل سوالات
+     */
+    fun getTotalQuestions(): Int = _questions.value?.size ?: 0
+
+    /**
+     * دریافت تعداد سوالات پاسخ داده شده
+     */
+    fun getAnsweredQuestionsCount(): Int = userAnswers.size
+
+    /**
+     * ریست وضعیت آزمون
+     */
+    fun resetExam() {
+        currentQuestionIndex = 0
+        userAnswers.clear()
+        isExamStarted = false
+        examStartTime = 0
+        _progress.value = 0f
+        _answeredCount.value = 0
+        _remainingTime.value = 0L
+        _currentQuestion.value = _questions.value?.getOrNull(0)
+        _uiState.value = ExamUiState.Ready
     }
-
-    fun saveAnswer(questionId: String, answer: String) {
-        val currentAnswers = _userAnswers.value.toMutableMap()
-        currentAnswers[questionId] = answer
-        _userAnswers.value = currentAnswers
-    }
-
-    fun getAnswer(questionId: String): String? {
-        return _userAnswers.value[questionId]
-    }
-
-    // Helper function to get current user ID (to be replaced with actual AuthRepository)
-    private suspend fun getCurrentUserId(): String? {
-        // TODO: Replace with actual AuthRepository call
-        return "user_123" // Mock user ID for now
-    }
-
-    // Extension properties
-    val Exam.isActive: Boolean
-        get() = this.status == ExamStatus.ACTIVE
-
-    val Exam.isCompleted: Boolean
-        get() = this.status == ExamStatus.COMPLETED
-
-    val Exam.isScheduled: Boolean
-        get() = this.status == ExamStatus.SCHEDULED
 }
 
-// State Classes
-sealed class ExamsState {
-    data object Loading : ExamsState()
-    data class Success(val exams: List<Exam>) : ExamsState()
-    data class Error(val message: String) : ExamsState()
-}
+// ==================== Result Wrapper ====================
+/**
+ * wrapper برای Result (در صورت عدم وجود در پروژه)
+ */
+sealed class Result<out T> {
+    data class Success<out T>(val data: T) : Result<T>()
+    data class Failure(val exception: Exception) : Result<Nothing>()
 
-sealed class ExamGenerationState {
-    data object Idle : ExamGenerationState()
-    data object Loading : ExamGenerationState()
-    data class Success(val exam: Exam?) : ExamGenerationState()
-    data class Submitted(val result: ExamResult?) : ExamGenerationState()
-    data class Error(val message: String) : ExamGenerationState()
+    val isSuccess: Boolean get() = this is Success<T>
+    val isFailure: Boolean get() = this is Failure
 }
-
-sealed class ExamResultsState {
-    data object Loading : ExamResultsState()
-    data class Success(val results: List<ExamResult>) : ExamResultsState()
-    data class Error(val message: String) : ExamResultsState()
-}
-
-// Data class for student answers
-data class StudentAnswer(
-    val questionId: String,
-    val answer: String,
-    val questionType: String
-)

@@ -56,5 +56,90 @@
     <color name="nav_drawer_text_color">#212121</color>
     <color name="nav_drawer_icon_color">#616161</color>
 
+    <!-- ===============================
+         NEW: Semantic Colors (برای Exam Activity)
+         =============================== -->
+    <color name="primary">@color/purple_500</color>
+    <color name="primary_variant">@color/purple_700</color>
+    <color name="secondary">@color/teal_200</color>
+    <color name="secondary_variant">@color/teal_700</color>
+
+    <!-- رنگ‌های پس‌زمینه -->
+    <color name="surface">#FFFFFF</color>
+    <color name="background_surface">#FAFAFA</color>
+
+    <!-- رنگ‌های متن -->
+    <color name="text_primary">#1F1F1F</color>
+    <color name="text_secondary">#666666</color>
+    <color name="text_on_primary">@color/white</color>
+    <color name="text_on_surface">#1F1F1F</color>
+
+    <!-- رنگ‌های وضعیت -->
+    <color name="success">@color/green</color>
+    <color name="error">@color/red</color>
+    <color name="warning">@color/orange</color>
+    <color name="info">@color/blue</color>
+
+    <!-- رنگ‌های کمکی -->
+    <color name="outline">@color/gray_300</color>
+    <color name="divider">@color/gray_200</color>
+    <color name="highlight">#FFF3E0</color>
+
+    <!-- رنگ‌های سفید شفاف -->
+    <color name="white_10">#1AFFFFFF</color>
+    <color name="white_30">#4DFFFFFF</color>
+    <color name="white_80">#CCFFFFFF</color>
+
+    <!-- رنگ‌های مشکی شفاف -->
+    <color name="black_10">#1A000000</color>
+    <color name="black_20">#33000000</color>
+    <color name="black_50">#80000000</color>
+
+    <!-- رنگ‌های مخصوص نسخه‌ها -->
+    <color name="pro_gold">#FFD700</color>
+    <color name="pro_gradient_start">#FFD700</color>
+    <color name="pro_gradient_end">#FFA500</color>
+    <color name="lite_blue">#2196F3</color>
+
+    <!-- رنگ‌های PDF و گزارش -->
+    <color name="pdf_background">#FFFFFF</color>
+    <color name="pdf_text">#212121</color>
+    <color name="pdf_header">#F5F5F5</color>
+    <color name="pdf_border">#E0E0E0</color>
+
+    <!-- رنگ‌های تایمر و زمان -->
+    <color name="timer_normal">#4CAF50</color>
+    <color name="timer_warning">#FF9800</color>
+    <color name="timer_critical">#F44336</color>
+
+    <!-- رنگ‌های وضعیت سوال -->
+    <color name="question_answered">#4CAF50</color>
+    <color name="question_flagged">#9C27B0</color>
+    <color name="question_skipped">#FF9800</color>
+    <color name="question_current">#2196F3</color>
+
+    <!-- رنگ‌های دکمه‌ها -->
+    <color name="button_primary">@color/purple_500</color>
+    <color name="button_primary_pressed">@color/purple_700</color>
+    <color name="button_secondary">@color/teal_200</color>
+    <color name="button_secondary_pressed">@color/teal_700</color>
+    <color name="button_disabled">@color/gray_300</color>
+
+    <!-- رنگ‌های Progress Bar -->
+    <color name="progress_background">@color/gray_200</color>
+    <color name="progress_primary">@color/purple_500</color>
+    <color name="progress_success">@color/green</color>
+    <color name="progress_warning">@color/orange</color>
+
+    <!-- رنگ‌های Card و Container -->
+    <color name="card_background">@color/white</color>
+    <color name="card_elevated">@color/white</color>
+    <color name="container_background">@color/background</color>
+
+    <!-- رنگ‌های Toast و Snackbar -->
+    <color name="snackbar_success">@color/green</color>
+    <color name="snackbar_error">@color/red</color>
+    <color name="snackbar_info">@color/blue</color>
+    <color name="snackbar_warning">@color/orange</color>
 
 </resources>

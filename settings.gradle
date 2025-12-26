@@ -1,6 +1,6 @@
 pluginManagement {
     repositories {
-        google()
+        google()                // حتماً باشه
         mavenCentral()
         gradlePluginPortal()
     }
@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "ExamApp"
+rootProject.name = "Azmoonak"
 include ':app'

@@ -1,4 +1,3 @@
-// app/src/main/java/com/examapp/data/network/ApiService.kt
 package com.examapp.data.network
 
 import com.examapp.data.models.*
@@ -199,103 +198,103 @@ interface ApiService {
     suspend fun reportBug(@Body request: BugReportRequest): Response<ApiResponse<Unit>>
 }
 
-// مدل‌های درخواست اضافی
+// مدل‌های درخواست و پاسخ (این‌ها رو نگه داشتم و تکمیل کردم)
 data class LoginRequest(
-    @SerializedName("username") val username: String,
-    @SerializedName("password") val password: String,
-    @SerializedName("device_token") val deviceToken: String? = null
+    val username: String,
+    val password: String,
+    val deviceToken: String? = null
 )
 
 data class RegisterRequest(
-    @SerializedName("username") val username: String,
-    @SerializedName("password") val password: String,
-    @SerializedName("email") val email: String? = null,
-    @SerializedName("phone") val phone: String? = null,
-    @SerializedName("first_name") val firstName: String,
-    @SerializedName("last_name") val lastName: String,
-    @SerializedName("grade") val grade: Int? = null,
-    @SerializedName("school") val school: String? = null,
-    @SerializedName("role") val role: UserRole = UserRole.STUDENT
+    val username: String,
+    val password: String,
+    val email: String? = null,
+    val phone: String? = null,
+    val firstName: String,
+    val lastName: String,
+    val grade: Int? = null,
+    val school: String? = null,
+    val role: UserRole = UserRole.STUDENT
 )
 
-data class RefreshTokenRequest(@SerializedName("refresh_token") val refreshToken: String)
-data class LogoutRequest(@SerializedName("device_token") val deviceToken: String? = null)
+data class RefreshTokenRequest(val refreshToken: String)
+data class LogoutRequest(val deviceToken: String? = null)
 data class AuthResponse(
-    @SerializedName("access_token") val accessToken: String,
-    @SerializedName("refresh_token") val refreshToken: String,
-    @SerializedName("expires_in") val expiresIn: Int
+    val accessToken: String,
+    val refreshToken: String,
+    val expiresIn: Int
 )
 
 data class UserUpdateRequest(
-    @SerializedName("first_name") val firstName: String? = null,
-    @SerializedName("last_name") val lastName: String? = null,
-    @SerializedName("email") val email: String? = null,
-    @SerializedName("phone") val phone: String? = null,
-    @SerializedName("grade") val grade: Int? = null,
-    @SerializedName("school") val school: String? = null,
-    @SerializedName("avatar_url") val avatarUrl: String? = null
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val email: String? = null,
+    val phone: String? = null,
+    val grade: Int? = null,
+    val school: String? = null,
+    val avatarUrl: String? = null
 )
 
 data class ChangePasswordRequest(
-    @SerializedName("current_password") val currentPassword: String,
-    @SerializedName("new_password") val newPassword: String
+    val currentPassword: String,
+    val newPassword: String
 )
 
 data class QuestionCountResponse(
-    @SerializedName("total") val total: Int,
-    @SerializedName("by_difficulty") val byDifficulty: Map<DifficultyLevel, Int>,
-    @SerializedName("by_type") val byType: Map<QuestionType, Int>
+    val total: Int,
+    val byDifficulty: Map<DifficultyLevel, Int>,
+    val byType: Map<QuestionType, Int>
 )
 
-data class QuestionBatchRequest(@SerializedName("question_ids") val questionIds: List<Int>)
-data class SubmitExamRequest(@SerializedName("answers") val answers: List<StudentAnswer>)
+data class QuestionBatchRequest(val questionIds: List<Int>)
+data class SubmitExamRequest(val answers: List<StudentAnswer>)
 data class UpdateSessionRequest(
-    @SerializedName("current_question") val currentQuestion: Int? = null,
-    @SerializedName("answers") val answers: List<Map<String, Any>>? = null
+    val currentQuestion: Int? = null,
+    val answers: List<Map<String, Any>>? = null
 )
 
 enum class StatisticsPeriod { DAILY, WEEKLY, MONTHLY, YEARLY }
 
 data class UserStatistics(
-    @SerializedName("total_exams") val totalExams: Int,
-    @SerializedName("average_score") val averageScore: Float,
-    @SerializedName("best_score") val bestScore: Float,
-    @SerializedName("total_time_spent") val totalTimeSpent: Int,
-    @SerializedName("accuracy_rate") val accuracyRate: Float,
-    @SerializedName("rank") val rank: Int? = null
+    val totalExams: Int,
+    val averageScore: Float,
+    val bestScore: Float,
+    val totalTimeSpent: Int,
+    val accuracyRate: Float,
+    val rank: Int? = null
 )
 
 data class SubscriptionPlan(
-    @SerializedName("id") val id: Int,
-    @SerializedName("name") val name: String,
-    @SerializedName("description") val description: String,
-    @SerializedName("price") val price: Float,
-    @SerializedName("duration_days") val durationDays: Int,
-    @SerializedName("features") val features: List<String>
+    val id: Int,
+    val name: String,
+    val description: String,
+    val price: Float,
+    val durationDays: Int,
+    val features: List<String>
 )
 
 data class SubscribeRequest(
-    @SerializedName("plan_id") val planId: Int,
-    @SerializedName("payment_method") val paymentMethod: String
+    val planId: Int,
+    val paymentMethod: String
 )
 
 data class Subscription(
-    @SerializedName("id") val id: Int,
-    @SerializedName("plan_id") val planId: Int,
-    @SerializedName("start_date") val startDate: Long,
-    @SerializedName("end_date") val endDate: Long,
-    @SerializedName("is_active") val isActive: Boolean,
-    @SerializedName("auto_renew") val autoRenew: Boolean
+    val id: Int,
+    val planId: Int,
+    val startDate: Long,
+    val endDate: Long,
+    val isActive: Boolean,
+    val autoRenew: Boolean
 )
 
 data class Notification(
-    @SerializedName("id") val id: Int,
-    @SerializedName("title") val title: String,
-    @SerializedName("message") val message: String,
-    @SerializedName("type") val type: NotificationType,
-    @SerializedName("data") val data: Map<String, Any>? = null,
-    @SerializedName("is_read") val isRead: Boolean,
-    @SerializedName("created_at") val createdAt: Long
+    val id: Int,
+    val title: String,
+    val message: String,
+    val type: NotificationType,
+    val data: Map<String, Any>? = null,
+    val isRead: Boolean,
+    val createdAt: Long
 )
 
 enum class NotificationType {
@@ -303,24 +302,24 @@ enum class NotificationType {
 }
 
 data class DeviceRegistrationRequest(
-    @SerializedName("device_id") val deviceId: String,
-    @SerializedName("device_token") val deviceToken: String,
-    @SerializedName("platform") val platform: String = "android",
-    @SerializedName("app_version") val appVersion: String
+    val deviceId: String,
+    val deviceToken: String,
+    val platform: String = "android",
+    val appVersion: String
 )
 
 data class FeedbackRequest(
-    @SerializedName("rating") val rating: Int,
-    @SerializedName("comment") val comment: String? = null,
-    @SerializedName("category") val category: FeedbackCategory
+    val rating: Int,
+    val comment: String? = null,
+    val category: FeedbackCategory
 )
 
 data class BugReportRequest(
-    @SerializedName("title") val title: String,
-    @SerializedName("description") val description: String,
-    @SerializedName("steps_to_reproduce") val stepsToReproduce: String? = null,
-    @SerializedName("device_info") val deviceInfo: String,
-    @SerializedName("app_version") val appVersion: String
+    val title: String,
+    val description: String,
+    val stepsToReproduce: String? = null,
+    val deviceInfo: String,
+    val appVersion: String
 )
 
 enum class FeedbackCategory {
